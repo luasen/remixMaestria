@@ -274,7 +274,7 @@ export default function Admin() {
   const [settingsDesc, setSettingsDesc] = useState(settings?.description || '');
   const [settingsLogo, setSettingsLogo] = useState(settings?.logoUrl || '');
   const [settingsBanner, setSettingsBanner] = useState(settings?.bannerUrl || '');
-  const [settingsFee, setSettingsFee] = useState(settings?.deliveryFee.toString() || '0');
+  const [settingsFee, setSettingsFee] = useState(settings?.deliveryFee?.toString() || '0');
   const [settingsPhone, setSettingsPhone] = useState(settings?.phone || '');
   const [settingsAddress, setSettingsAddress] = useState(settings?.address || '');
   const [settingsSaved, setSettingsSaved] = useState(false);

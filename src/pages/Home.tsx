@@ -67,7 +67,7 @@ export default function Home() {
               <MapPin className="h-4.5 w-4.5 text-orange-500" />
               <span className="mt-1 text-[10px] font-semibold text-gray-400">Entrega</span>
               <span className="text-xs font-bold text-gray-800">
-                {settings?.deliveryFee === 0 ? 'Grátis' : `R$ ${settings?.deliveryFee.toFixed(2)}`}
+                {settings?.deliveryFee === undefined ? 'R$ 0.00' : settings.deliveryFee === 0 ? 'Grátis' : `R$ ${settings.deliveryFee.toFixed(2)}`}
               </span>
             </div>
             <div className="flex flex-col items-center rounded-2xl bg-white/45 border border-white/25 p-2.5 text-center">
