@@ -70,8 +70,8 @@ export default function Header({ onBack, title, showBack = false }: HeaderProps)
             </button>
           )}
 
-          {/* Admin toggle if not in admin */}
-          {!isAdmin && (
+          {/* Admin toggle if not in admin and user has admin privileges */}
+          {!isAdmin && (profile?.role === 'admin' || profile?.role === 'superadmin') && (
             <button
               onClick={() => setActiveView('admin')}
               id="btn-nav-admin-header"

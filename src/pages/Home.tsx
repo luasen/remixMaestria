@@ -6,7 +6,7 @@ import { motion } from 'motion/react';
 
 export default function Home() {
   const { settings, setActiveView, orders } = useApp();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const myOrdersCount = user 
     ? orders.filter(o => o.usuario?.uid === user.uid).length 
@@ -121,20 +121,22 @@ export default function Home() {
         </div>
 
         {/* Quick Admin Access Hint */}
-        <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/40 bg-white/20 backdrop-blur-sm p-4 text-center">
-          <ShieldCheck className="h-6 w-6 text-gray-400" />
-          <h4 className="mt-1.5 text-xs font-bold text-gray-700">Área de Demonstração / Testes</h4>
-          <p className="mt-0.5 text-[10px] text-gray-500 max-w-[280px]">
-            Como este é um MVP completo, você pode simular compras no Cardápio e gerenciar os pedidos no painel administrativo ao mesmo tempo!
-          </p>
-          <button
-            onClick={() => setActiveView('admin')}
-            id="btn-quick-admin"
-            className="mt-3 text-xs font-semibold text-orange-600 hover:text-orange-700 transition"
-          >
-            Acessar Painel Admin &rarr;
-          </button>
-        </div>
+        {(profile?.role === 'admin' || profile?.role === 'superadmin') && (
+          <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/40 bg-white/20 backdrop-blur-sm p-4 text-center">
+            <ShieldCheck className="h-6 w-6 text-gray-400" />
+            <h4 className="mt-1.5 text-xs font-bold text-gray-700">Área de Demonstração / Testes</h4>
+            <p className="mt-0.5 text-[10px] text-gray-500 max-w-[280px]">
+              Como este é um MVP completo, você pode simular compras no Cardápio e gerenciar os pedidos no painel administrativo ao mesmo tempo!
+            </p>
+            <button
+              onClick={() => setActiveView('admin')}
+              id="btn-quick-admin"
+              className="mt-3 text-xs font-semibold text-orange-600 hover:text-orange-700 transition"
+            >
+              Acessar Painel Admin &rarr;
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

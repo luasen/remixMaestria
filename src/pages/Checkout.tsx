@@ -404,13 +404,15 @@ export default function Checkout() {
             </div>
 
             <div className="mt-8 flex flex-col gap-2">
-              <button
-                onClick={() => setActiveView('admin')}
-                id="success-btn-admin"
-                className="w-full rounded-2xl bg-gray-900 py-3.5 text-xs font-bold text-white transition hover:bg-black"
-              >
-                Ver Pedidos no Painel Admin
-              </button>
+              {(profile?.role === 'admin' || profile?.role === 'superadmin') && (
+                <button
+                  onClick={() => setActiveView('admin')}
+                  id="success-btn-admin"
+                  className="w-full rounded-2xl bg-gray-900 py-3.5 text-xs font-bold text-white transition hover:bg-black"
+                >
+                  Ver Pedidos no Painel Admin
+                </button>
+              )}
               <button
                 onClick={() => setActiveView('home')}
                 id="success-btn-home"
