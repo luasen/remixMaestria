@@ -34,7 +34,8 @@ import {
   Lock,
   Palette,
   FileJson,
-  Save
+  Save,
+  MessageSquare
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,6 +44,7 @@ import { formatPrice, formatDate } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 // @ts-ignore
 import restaurantBanner from '../assets/images/restaurant_banner_1783985102418.jpg';
+import OrderChatModal from '../components/OrderChatModal';
 
 type AdminTab = 'orders' | 'products' | 'categories' | 'settings' | 'employees' | 'systemSettings';
 
@@ -67,6 +69,7 @@ export default function Admin() {
 
   const { user, profile, loading, setIsAuthOpen } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('orders');
+  const [selectedChatOrder, setSelectedChatOrder] = useState<any | null>(null);
 
   // --- EMPLOYEES MANAGEMENT STATE ---
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
@@ -720,6 +723,15 @@ export default function Admin() {
 
                       {/* Order Action/Transition triggers */}
                       <div className="mt-4.5 flex gap-2 pt-1 border-t border-white/20">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedChatOrder(order)}
+                          className="px-3.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 border border-orange-500/10 flex items-center justify-center transition active:scale-95 shrink-0"
+                          title="Conversar no Chat do Pedido"
+                        >
+                          <MessageSquare className="h-4.5 w-4.5" />
+                        </button>
+
                         {order.status === 'pending' && (
                           <button
                             onClick={() => updateOrderStatus(order.id, 'preparing')}
@@ -2574,6 +2586,16 @@ export default function Admin() {
           </div>
         )}
       </AnimatePresence>
+
+      {selectedChatOrder && (
+        <OrderChatModal
+          orderId={selectedChatOrder.id}
+          orderNumber={selectedChatOrder.id}
+          customerName={selectedChatOrder.customerName}
+          isOpen={!!selectedChatOrder}
+          onClose={() => setSelectedChatOrder(null)}
+        />
+      )}
     </div>
   );
 }

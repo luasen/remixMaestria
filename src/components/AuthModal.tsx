@@ -73,30 +73,48 @@ export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps
       if (err.code === 'auth/popup-blocked') {
         setError('O popup de login foi bloqueado pelo navegador. Por favor, permita popups.');
       } else if (err.code === 'auth/closed-by-user' || err.code === 'auth/popup-closed-by-user') {
+        const currentDomain = window.location.hostname;
         setError(
           <div className="flex flex-col gap-1.5 text-left text-xs">
             <span className="font-bold text-red-700 block">⚠️ Login com Google Cancelado ou Fechado:</span>
             <span>A janela de login do Google foi fechada antes de concluir o acesso.</span>
-            <div className="bg-orange-500/5 border border-orange-500/10 p-2.5 rounded-xl mt-1 text-[11px] text-gray-600">
-              <span className="font-semibold text-orange-700 block mb-1">💡 Dicas para Entrar Sem Problemas:</span>
-              <ul className="list-disc pl-4 space-y-1">
-                <li>Use o login por <strong>E-mail e Senha</strong> logo acima (funciona 100% no visualizador).</li>
-                <li>Ou clique em <strong>"Abrir em nova aba" ↗️</strong> no canto superior direito do visualizador para usar o Google.</li>
-              </ul>
+            <div className="bg-orange-500/5 border border-orange-500/10 p-2.5 rounded-xl mt-1 text-[11px] text-gray-600 space-y-1.5">
+              <span className="font-semibold text-orange-700 block">💡 Como Resolver Este Problema:</span>
+              <p>
+                <strong>1. Verifique se o domínio está autorizado no Firebase:</strong><br />
+                O domínio <strong className="select-all font-mono text-[10px] bg-black/5 px-1 rounded">{currentDomain}</strong> precisa estar na lista de <strong>"Domínios autorizados"</strong> nas configurações de Autenticação do seu Console do Firebase.
+              </p>
+              <p>
+                <strong>2. Ative o Provedor Google:</strong><br />
+                Certifique-se de que o provedor de login "Google" está ativado em seu projeto do Firebase em <strong>Authentication &gt; Sign-in method</strong>.
+              </p>
+              <p>
+                <strong>3. Use o login por E-mail e Senha:</strong><br />
+                Use o formulário de e-mail e senha logo acima (funciona de forma 100% direta).
+              </p>
+              <p>
+                <strong>4. Abra em uma nova aba se estiver no visualizador:</strong><br />
+                Se estiver testando dentro do visualizador do AI Studio, clique em <strong>"Abrir em nova aba" ↗️</strong> no canto superior direito para evitar o bloqueio de popups e cookies de terceiros pelo navegador.
+              </p>
             </div>
           </div>
         );
       } else if (err.code === 'auth/operation-not-allowed') {
         setError('O provedor de login do Google está desativado no Console do Firebase. Ative-o em Authentication > Sign-in method.');
       } else if (err.code === 'auth/unauthorized-domain') {
+        const currentDomain = window.location.hostname;
         setError(
           <div className="flex flex-col gap-1.5 text-left text-xs">
             <span className="font-bold text-red-700 block">⚠️ Domínio Não Autorizado no Firebase:</span>
-            <span>Este domínio de desenvolvimento precisa ser autorizado no seu Console do Firebase.</span>
-            <span>Acesse <strong>Authentication &gt; Configurações &gt; Domínios autorizados</strong> e adicione estes dois domínios:</span>
-            <ul className="list-disc pl-4 mt-1 font-mono text-[10px] bg-black/5 p-1.5 rounded-lg select-all">
-              <li>ais-dev-dsrcky2l6nrjvn52csw6jv-421365387983.us-west1.run.app</li>
-              <li>ais-pre-dsrcky2l6nrjvn52csw6jv-421365387983.us-west1.run.app</li>
+            <span>O domínio onde o site está rodando precisa ser autorizado no seu Console do Firebase.</span>
+            <span>Acesse <strong>Authentication &gt; Configurações &gt; Domínios autorizados</strong> e adicione o seguinte domínio:</span>
+            <div className="font-mono text-[11px] bg-black/5 p-2 rounded-lg select-all break-all border border-black/10">
+              {currentDomain}
+            </div>
+            <span className="text-gray-500 mt-1">Se você estiver no visualizador do editor, adicione também estes domínios de visualização se necessário:</span>
+            <ul className="list-disc pl-4 font-mono text-[10px] bg-black/5 p-1.5 rounded-lg select-all">
+              <li>ais-dev-mspmaj3jr76kak5lfjtw3r-421365387983.us-west1.run.app</li>
+              <li>ais-pre-mspmaj3jr76kak5lfjtw3r-421365387983.us-west1.run.app</li>
             </ul>
           </div>
         );

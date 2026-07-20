@@ -19,15 +19,18 @@ import {
   AlertCircle,
   Sparkles,
   ArrowRight,
-  ClipboardList
+  ClipboardList,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import OrderChatModal from '../components/OrderChatModal';
 
 export default function Motoboy() {
   const { user, profile, updateProfile, setIsAuthOpen } = useAuth();
   const { orders, updateOrder } = useApp();
   const [activeTab, setActiveTab] = useState<'available' | 'active' | 'history'>('available');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedChatOrder, setSelectedChatOrder] = useState<any | null>(null);
 
   // 1. Authorization Check
   if (!user) {
@@ -396,15 +399,25 @@ export default function Motoboy() {
                           <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Cliente</span>
                           <span className="font-bold text-gray-800 text-sm mt-0.5 block">{order.customerName}</span>
                         </div>
-                        {order.customerPhone && (
-                          <a
-                            href={`tel:${order.customerPhone}`}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm hover:bg-orange-700 transition"
-                            title="Ligar para Cliente"
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedChatOrder(order)}
+                            className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 border border-orange-500/10 shadow-sm hover:bg-orange-500/20 transition"
+                            title="Chat do Pedido"
                           >
-                            <Phone className="h-4.5 w-4.5" />
-                          </a>
-                        )}
+                            <MessageSquare className="h-4.5 w-4.5" />
+                          </button>
+                          {order.customerPhone && (
+                            <a
+                              href={`tel:${order.customerPhone}`}
+                              className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm hover:bg-orange-700 transition"
+                              title="Ligar para Cliente"
+                            >
+                              <Phone className="h-4.5 w-4.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex items-start gap-2 bg-blue-50/20 p-3 rounded-2xl border border-blue-500/5">
@@ -559,6 +572,16 @@ export default function Motoboy() {
           </div>
         )}
       </div>
+
+      {selectedChatOrder && (
+        <OrderChatModal
+          orderId={selectedChatOrder.id}
+          orderNumber={selectedChatOrder.id}
+          customerName={selectedChatOrder.customerName}
+          isOpen={!!selectedChatOrder}
+          onClose={() => setSelectedChatOrder(null)}
+        />
+      )}
     </div>
   );
 }

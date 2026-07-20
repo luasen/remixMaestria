@@ -75,6 +75,13 @@ service cloud.firestore {
                       ))
                     ));
       allow delete: if isAdmin();
+
+      // Subcollection for Order Chat (Client <-> Motoboy <-> Admin)
+      match /messages/{messageId} {
+        allow read: if isAdmin() || isMotoboy() || 
+                      (isSignedIn() && get(/databases/$(database)/documents/orders/$(orderId)).data.usuario.uid == request.auth.uid);
+        allow create: if isSignedIn();
+      }
     }
 
     // Collection: Coupons

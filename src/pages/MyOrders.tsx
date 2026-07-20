@@ -23,14 +23,17 @@ import {
   Loader2,
   LogOut,
   Search,
-  Sparkles
+  Sparkles,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import OrderChatModal from '../components/OrderChatModal';
 
 export default function MyOrders() {
   const { user, profile, setIsAuthOpen, updateProfile, logout } = useAuth();
   const { orders, setActiveView } = useApp();
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [selectedChatOrder, setSelectedChatOrder] = useState<any | null>(null);
   
   // Tab state: 'profile' (default) or 'orders'
   const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
@@ -696,6 +699,19 @@ export default function MyOrders() {
                                     </div>
                                   </div>
                                 )}
+
+                                {/* Real-time chat integration */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedChatOrder(order);
+                                  }}
+                                  className="w-full h-11 mt-3 rounded-2xl bg-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-orange-700 transition shadow-md shadow-orange-500/10 active:scale-95"
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                  <span>Abrir Chat do Pedido</span>
+                                </button>
                               </div>
                             </motion.div>
                           )}
@@ -709,6 +725,16 @@ export default function MyOrders() {
           )}
         </AnimatePresence>
       </div>
+
+      {selectedChatOrder && (
+        <OrderChatModal
+          orderId={selectedChatOrder.id}
+          orderNumber={selectedChatOrder.id}
+          customerName={selectedChatOrder.customerName}
+          isOpen={!!selectedChatOrder}
+          onClose={() => setSelectedChatOrder(null)}
+        />
+      )}
     </div>
   );
 }
