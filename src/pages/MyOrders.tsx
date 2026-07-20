@@ -701,17 +701,19 @@ export default function MyOrders() {
                                 )}
 
                                 {/* Real-time chat integration */}
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedChatOrder(order);
-                                  }}
-                                  className="w-full h-11 mt-3 rounded-2xl bg-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-orange-700 transition shadow-md shadow-orange-500/10 active:scale-95"
-                                >
-                                  <MessageSquare className="h-4 w-4" />
-                                  <span>Abrir Chat do Pedido</span>
-                                </button>
+                                {order.tipoPedido === 'entrega' && order.motoboyId && order.status !== 'delivered' && order.statusEntrega !== 'entregue' && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedChatOrder(order);
+                                    }}
+                                    className="w-full h-11 mt-3 rounded-2xl bg-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-orange-700 transition shadow-md shadow-orange-500/10 active:scale-95 animate-fade-in"
+                                  >
+                                    <MessageSquare className="h-4 w-4" />
+                                    <span>Conversar com o Entregador (Chat)</span>
+                                  </button>
+                                )}
                               </div>
                             </motion.div>
                           )}
