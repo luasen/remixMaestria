@@ -69,27 +69,29 @@ export default function Motoboy() {
   }
 
   // 2. Data Filtering for Motoboy
-  // Available orders: tipoPedido === 'entrega', no motoboy assigned, status is accepted and not delivered
+  // Available orders: tipoPedido === 'entrega', no motoboy assigned, status is strictly 'ready' (Pronto)
   const availableOrders = orders.filter(
     (order) => 
       order.tipoPedido === 'entrega' && 
       !order.motoboyId && 
-      (order.status === 'preparing' || order.status === 'ready')
+      order.status === 'ready'
   );
 
-  // Active orders assigned to this motoboy and not yet delivered
+  // Active orders assigned to this motoboy, not yet delivered, and NOT refused by admin
   const activeOrders = orders.filter(
     (order) => 
       order.motoboyId === user.uid && 
       order.statusEntrega !== 'entregue' && 
-      order.status !== 'delivered'
+      order.status !== 'delivered' &&
+      order.status !== 'refused'
   );
 
-  // Completed order history for this motoboy
+  // Completed order history for this motoboy (successfully delivered, excluding refused)
   const completedOrders = orders.filter(
     (order) => 
       order.motoboyId === user.uid && 
-      (order.statusEntrega === 'entregue' || order.status === 'delivered')
+      (order.statusEntrega === 'entregue' || order.status === 'delivered') &&
+      order.status !== 'refused'
   );
 
   // Toggle online status
