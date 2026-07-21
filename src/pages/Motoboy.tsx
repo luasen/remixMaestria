@@ -54,7 +54,7 @@ export default function Motoboy() {
     );
   }
 
-  if (profile?.role !== 'motoboy') {
+  if (profile?.role !== 'motoboy' && profile?.role !== 'superadmin' && profile?.role !== 'admin') {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-6 text-center bg-gray-50/50">
         <div className="rounded-full bg-red-100 p-4 mb-4 text-red-600">
