@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import OrderChatModal from '../components/OrderChatModal';
+import ChatButtonWithBadge from '../components/ChatButtonWithBadge';
 
 export default function Motoboy() {
   const { user, profile, updateProfile, setIsAuthOpen } = useAuth();
@@ -68,12 +69,12 @@ export default function Motoboy() {
   }
 
   // 2. Data Filtering for Motoboy
-  // Available orders: tipoPedido === 'entrega', no motoboy assigned, status is not 'delivered' (or 'pending'/'preparing'/'ready')
+  // Available orders: tipoPedido === 'entrega', no motoboy assigned, status is accepted and not delivered
   const availableOrders = orders.filter(
     (order) => 
       order.tipoPedido === 'entrega' && 
       !order.motoboyId && 
-      order.status !== 'delivered'
+      (order.status === 'preparing' || order.status === 'ready')
   );
 
   // Active orders assigned to this motoboy and not yet delivered
@@ -124,6 +125,10 @@ export default function Motoboy() {
 
   // Start Delivery (A Caminho)
   const handleStartDelivery = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status !== 'ready') {
+      return;
+    }
     setIsUpdating(true);
     try {
       await updateOrder(orderId, {
@@ -400,14 +405,12 @@ export default function Motoboy() {
                           <span className="font-bold text-gray-800 text-sm mt-0.5 block">{order.customerName}</span>
                         </div>
                         <div className="flex gap-2">
-                          <button
-                            type="button"
+                          <ChatButtonWithBadge
+                            orderId={order.id}
                             onClick={() => setSelectedChatOrder(order)}
-                            className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 border border-orange-500/10 shadow-sm hover:bg-orange-500/20 transition"
-                            title="Chat do Pedido"
-                          >
-                            <MessageSquare className="h-4.5 w-4.5" />
-                          </button>
+                            size="icon"
+                            variant="outline"
+                          />
                           {order.customerPhone && (
                             <a
                               href={`tel:${order.customerPhone}`}
@@ -475,19 +478,26 @@ export default function Motoboy() {
 
                       <div className="grid grid-cols-2 gap-3 mt-1">
                         {isAccepted ? (
-                          <button
-                            onClick={() => handleStartDelivery(order.id)}
-                            disabled={isUpdating}
-                            className="col-span-2 rounded-2xl bg-amber-500 py-3.5 text-xs font-bold text-white hover:bg-amber-600 transition shadow-md shadow-amber-500/10 flex items-center justify-center gap-1.5"
-                          >
-                            <Navigation className="h-4 w-4 animate-pulse" />
-                            <span>Iniciar Entrega (Saiu p/ entrega)</span>
-                          </button>
+                          order.status !== 'ready' ? (
+                            <div className="col-span-2 rounded-2xl bg-gray-50 border border-gray-200/60 py-3.5 text-xs font-bold text-gray-400 flex items-center justify-center gap-1.5 cursor-not-allowed select-none">
+                              <Clock className="h-4 w-4 animate-spin" style={{ animationDuration: '3s' }} />
+                              <span>Aguardando preparo do restaurante...</span>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleStartDelivery(order.id)}
+                              disabled={isUpdating}
+                              className="col-span-2 rounded-2xl bg-amber-500 py-3.5 text-xs font-bold text-white hover:bg-amber-600 transition shadow-md shadow-amber-500/10 flex items-center justify-center gap-1.5 active:scale-95"
+                            >
+                              <Navigation className="h-4 w-4 animate-pulse" />
+                              <span>Iniciar Entrega (Saiu p/ entrega)</span>
+                            </button>
+                          )
                         ) : (
                           <button
                             onClick={() => handleCompleteDelivery(order.id)}
                             disabled={isUpdating}
-                            className="col-span-2 rounded-2xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5"
+                            className="col-span-2 rounded-2xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5 active:scale-95"
                           >
                             <CheckCircle2 className="h-4 w-4" />
                             <span>Finalizar Entrega (Entregue)</span>
@@ -556,13 +566,21 @@ export default function Motoboy() {
                           Concluído às {order.horarioEntrega ? new Date(order.horarioEntrega).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Concluído'}
                         </span>
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-xs font-black text-gray-800 block">
-                          {formatPrice(order.valorTotal || order.total)}
-                        </span>
-                        <span className="text-[9px] font-medium text-gray-400">
-                          {order.paymentMethod === 'pix' ? 'Pix' : order.paymentMethod === 'card' ? 'Cartão' : 'Dinheiro'}
-                        </span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="text-xs font-black text-gray-800 block">
+                            {formatPrice(order.valorTotal || order.total)}
+                          </span>
+                          <span className="text-[9px] font-medium text-gray-400">
+                            {order.paymentMethod === 'pix' ? 'Pix' : order.paymentMethod === 'card' ? 'Cartão' : 'Dinheiro'}
+                          </span>
+                        </div>
+                        <ChatButtonWithBadge
+                          orderId={order.id}
+                          onClick={() => setSelectedChatOrder(order)}
+                          size="icon"
+                          variant="outline"
+                        />
                       </div>
                     </div>
                   ))}

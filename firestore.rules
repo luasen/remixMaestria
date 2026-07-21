@@ -78,9 +78,36 @@ service cloud.firestore {
 
       // Subcollection for Order Chat (Client <-> Motoboy <-> Admin)
       match /messages/{messageId} {
-        allow read: if isAdmin() || isMotoboy() || 
+        allow read: if isAdmin() || 
+                      (isMotoboy() && get(/databases/$(database)/documents/orders/$(orderId)).data.motoboyId == request.auth.uid) || 
                       (isSignedIn() && get(/databases/$(database)/documents/orders/$(orderId)).data.usuario.uid == request.auth.uid);
-        allow create: if isSignedIn();
+        allow create: if isSignedIn() && 
+                      (
+                        isAdmin() || 
+                        (isMotoboy() && get(/databases/$(database)/documents/orders/$(orderId)).data.motoboyId == request.auth.uid) || 
+                        (get(/databases/$(database)/documents/orders/$(orderId)).data.usuario.uid == request.auth.uid)
+                      ) && 
+                      get(/databases/$(database)/documents/orders/$(orderId)).data.status != 'delivered' && 
+                      get(/databases/$(database)/documents/orders/$(orderId)).data.statusEntrega != 'entregue';
+        allow update: if isSignedIn() && 
+                      (
+                        isAdmin() || 
+                        (isMotoboy() && get(/databases/$(database)/documents/orders/$(orderId)).data.motoboyId == request.auth.uid) || 
+                        (get(/databases/$(database)/documents/orders/$(orderId)).data.usuario.uid == request.auth.uid)
+                      );
+      }
+
+      // Subcollection for Typing indicators
+      match /typing/{userId} {
+        allow read: if isAdmin() || 
+                      (isMotoboy() && get(/databases/$(database)/documents/orders/$(orderId)).data.motoboyId == request.auth.uid) || 
+                      (isSignedIn() && get(/databases/$(database)/documents/orders/$(orderId)).data.usuario.uid == request.auth.uid);
+        allow write: if isSignedIn() && request.auth.uid == userId &&
+                      (
+                        (get(/databases/$(database)/documents/orders/$(orderId)).data.status != 'delivered' && 
+                         get(/databases/$(database)/documents/orders/$(orderId)).data.statusEntrega != 'entregue') ||
+                        (request.resource != null && request.resource.data.isTyping == false)
+                      );
       }
     }
 

@@ -35,7 +35,9 @@ import {
   Palette,
   FileJson,
   Save,
-  MessageSquare
+  MessageSquare,
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,8 +47,10 @@ import { motion, AnimatePresence } from 'motion/react';
 // @ts-ignore
 import restaurantBanner from '../assets/images/restaurant_banner_1783985102418.jpg';
 import OrderChatModal from '../components/OrderChatModal';
+import ChatButtonWithBadge from '../components/ChatButtonWithBadge';
+import AdminChatDashboard from '../components/AdminChatDashboard';
 
-type AdminTab = 'orders' | 'products' | 'categories' | 'settings' | 'employees' | 'systemSettings';
+type AdminTab = 'orders' | 'products' | 'categories' | 'settings' | 'employees' | 'systemSettings' | 'chats';
 
 export default function Admin() {
   const {
@@ -61,6 +65,7 @@ export default function Admin() {
     updateCategory,
     deleteCategory,
     updateOrderStatus,
+    updateOrder,
     updateSettings,
     getUsers,
     updateUserProfile,
@@ -150,6 +155,8 @@ export default function Admin() {
 
   // --- ORDER MANAGEMENT STATE ---
   const [selectedOrderStatusFilter, setSelectedOrderStatusFilter] = useState<string>('all');
+  const [refusingOrderId, setRefusingOrderId] = useState<string | null>(null);
+  const [refusalReason, setRefusalReason] = useState('');
 
   const filteredOrders = orders.filter((order) => {
     if (selectedOrderStatusFilter === 'all') return true;
@@ -166,6 +173,8 @@ export default function Admin() {
         return 'bg-purple-50 text-purple-700 border-purple-100';
       case 'delivered':
         return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+      case 'refused':
+        return 'bg-rose-50 text-rose-700 border-rose-100';
       default:
         return 'bg-gray-50 text-gray-700 border-gray-100';
     }
@@ -177,6 +186,7 @@ export default function Admin() {
       case 'preparing': return 'Em Preparo';
       case 'ready': return 'Pronto (Retirada/Entrega)';
       case 'delivered': return 'Entregue';
+      case 'refused': return 'Recusado';
     }
   };
 
@@ -562,6 +572,19 @@ export default function Admin() {
           </button>
 
           <button
+            onClick={() => setActiveTab('chats')}
+            id="tab-btn-chats"
+            className={`flex flex-col items-center justify-center py-3.5 px-3 border-b-2 text-xs font-bold transition-all ${
+              activeTab === 'chats'
+                ? 'border-orange-500 text-orange-600 font-extrabold'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <MessageSquare className="h-4.5 w-4.5 mb-1" />
+            Central de Chats
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             id="tab-btn-settings"
             className={`flex flex-col items-center justify-center py-3.5 px-3 border-b-2 text-xs font-bold transition-all ${
@@ -591,7 +614,7 @@ export default function Admin() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-lg px-4 py-5">
+      <div className={`mx-auto px-4 py-5 transition-all duration-300 ${activeTab === 'chats' ? 'max-w-6xl' : 'max-w-lg'}`}>
         <AnimatePresence mode="wait">
           {/* ======================================= */}
           {/* 1. ORDERS TAB */}
@@ -723,24 +746,50 @@ export default function Admin() {
 
                       {/* Order Action/Transition triggers */}
                       <div className="mt-4.5 flex gap-2 pt-1 border-t border-white/20">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedChatOrder(order)}
-                          className="px-3.5 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 border border-orange-500/10 flex items-center justify-center transition active:scale-95 shrink-0"
-                          title="Conversar no Chat do Pedido"
-                        >
-                          <MessageSquare className="h-4.5 w-4.5" />
-                        </button>
+                        {order.tipoPedido === 'entrega' && order.motoboyId && (
+                          <ChatButtonWithBadge
+                            orderId={order.id}
+                            onClick={() => setSelectedChatOrder(order)}
+                            size="icon"
+                            variant="outline"
+                          />
+                        )}
 
                         {order.status === 'pending' && (
-                          <button
-                            onClick={() => updateOrderStatus(order.id, 'preparing')}
-                            id={`btn-status-preparing-${order.id}`}
-                            className="flex-1 flex items-center justify-center gap-1 bg-orange-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-orange-700 transition"
-                          >
-                            <Clock3 className="h-4 w-4" />
-                            Começar Preparo
-                          </button>
+                          <div className="flex-1 flex gap-2 w-full">
+                            <button
+                              onClick={() => updateOrderStatus(order.id, 'preparing')}
+                              id={`btn-status-preparing-${order.id}`}
+                              className="flex-1 flex items-center justify-center gap-1 bg-orange-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-orange-700 transition"
+                            >
+                              <Check className="h-4 w-4" />
+                              Aceitar e Preparar
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRefusingOrderId(order.id);
+                                setRefusalReason('');
+                              }}
+                              id={`btn-status-refuse-${order.id}`}
+                              className="flex-1 flex items-center justify-center gap-1 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl py-2.5 text-xs font-bold hover:bg-rose-100 transition"
+                            >
+                              <X className="h-4 w-4" />
+                              Recusar Pedido
+                            </button>
+                          </div>
+                        )}
+                        {order.status === 'refused' && (
+                          <div className="flex-1 flex flex-col gap-1.5 p-3 rounded-xl bg-red-500/5 border border-red-500/15">
+                            <div className="flex items-center gap-1.5 text-red-700 text-xs font-bold">
+                              <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                              <span>Pedido Recusado</span>
+                            </div>
+                            {order.motivoRecusa && (
+                              <p className="text-[10px] text-gray-500 font-medium leading-normal">
+                                <strong>Motivo:</strong> {order.motivoRecusa}
+                              </p>
+                            )}
+                          </div>
                         )}
                         {order.status === 'preparing' && (
                           <button
@@ -2534,6 +2583,21 @@ export default function Admin() {
               </div>
             </motion.div>
           )}
+
+          {/* ======================================= */}
+          {/* 7. CHATS TAB */}
+          {/* ======================================= */}
+          {activeTab === 'chats' && (
+            <motion.div
+              key="tab-chats"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 15 }}
+              transition={{ duration: 0.2 }}
+            >
+              <AdminChatDashboard />
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -2580,6 +2644,74 @@ export default function Admin() {
                   className="rounded-xl bg-rose-600 py-2.5 px-5 text-xs font-bold text-white hover:bg-rose-700 transition"
                 >
                   Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Refusal Reason Modal */}
+      <AnimatePresence>
+        {refusingOrderId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setRefusingOrderId(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            {/* Modal Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md overflow-hidden rounded-3xl border border-white/30 bg-white/80 p-6 shadow-2xl backdrop-blur-lg"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                  <X className="h-5 w-5" />
+                </span>
+                <h3 className="font-sans text-base font-extrabold text-gray-900">
+                  Recusar Pedido {refusingOrderId}
+                </h3>
+              </div>
+              <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                Por favor, informe ao cliente o motivo da recusa deste pedido. Esta informação ficará visível no acompanhamento do cliente.
+              </p>
+              
+              <div className="mb-5">
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Motivo da Recusa</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={refusalReason}
+                  onChange={(e) => setRefusalReason(e.target.value)}
+                  placeholder="Ex: No momento estamos sem motoboys disponíveis para sua região, ou ingrediente esgotado..."
+                  className="w-full rounded-2xl border border-gray-200 bg-white py-3 px-4 text-xs font-semibold text-gray-800 outline-none transition focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 placeholder-gray-400"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setRefusingOrderId(null)}
+                  className="rounded-xl border border-white/45 bg-white/20 py-2.5 px-4 text-xs font-bold text-gray-500 hover:bg-white/50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!refusalReason.trim()}
+                  onClick={async () => {
+                    await updateOrder(refusingOrderId, { status: 'refused', motivoRecusa: refusalReason });
+                    setRefusingOrderId(null);
+                  }}
+                  className="rounded-xl bg-rose-600 py-2.5 px-5 text-xs font-bold text-white hover:bg-rose-700 transition disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  Confirmar Recusa
                 </button>
               </div>
             </motion.div>

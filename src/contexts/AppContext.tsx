@@ -4,6 +4,7 @@ import { dbService } from '../services/db';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from './AuthContext';
+import { updateThemeColors } from '../utils/theme';
 
 export type ActiveView = 'home' | 'menu' | 'cart' | 'checkout' | 'admin' | 'motoboy' | 'my-orders';
 
@@ -65,6 +66,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    updateThemeColors(settings?.primaryColor, settings?.secondaryColor);
+  }, [settings]);
 
   useEffect(() => {
     if (!user) {

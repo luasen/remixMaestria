@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import OrderChatModal from '../components/OrderChatModal';
+import ChatButtonWithBadge from '../components/ChatButtonWithBadge';
 
 export default function MyOrders() {
   const { user, profile, setIsAuthOpen, updateProfile, logout } = useAuth();
@@ -35,8 +36,11 @@ export default function MyOrders() {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [selectedChatOrder, setSelectedChatOrder] = useState<any | null>(null);
   
-  // Tab state: 'profile' (default) or 'orders'
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
+  // Tab state: 'profile' or 'orders' (default)
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('orders');
+
+  // Sub-tab for orders list: 'active' (default) or 'history'
+  const [ordersSubTab, setOrdersSubTab] = useState<'active' | 'history'>('active');
 
   // Profile Form States
   const [name, setName] = useState('');
@@ -97,6 +101,10 @@ export default function MyOrders() {
     );
   });
 
+  const activeOrders = myOrders.filter(order => order.status !== 'delivered' && order.status !== 'refused');
+  const completedOrders = myOrders.filter(order => order.status === 'delivered' || order.status === 'refused');
+  const displayedOrders = ordersSubTab === 'active' ? activeOrders : completedOrders;
+
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
       case 'pix': return 'Pix';
@@ -107,6 +115,9 @@ export default function MyOrders() {
   };
 
   const getOrderStatusInfo = (status: string, statusEntrega?: string) => {
+    if (status === 'refused') {
+      return { label: 'Recusado', color: 'bg-rose-50 text-rose-700 border-rose-100', step: 0 };
+    }
     if (status === 'delivered') {
       return { label: 'Entregue / Finalizado', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', step: 4 };
     }
@@ -506,7 +517,56 @@ export default function MyOrders() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">
-                  {myOrders.map((order) => {
+                  {/* Modern Sub-tab Switcher inside Orders */}
+                  <div className="flex border-b border-gray-200/60 pb-1.5 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOrdersSubTab('active')}
+                      className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 text-center flex items-center justify-center gap-1.5 ${
+                        ordersSubTab === 'active'
+                          ? 'border-orange-500 text-orange-600 font-extrabold'
+                          : 'border-transparent text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      <span>Ativos</span>
+                      <span className={`inline-flex items-center justify-center h-4.5 px-1.5 text-[9px] font-black rounded-full transition-colors ${
+                        ordersSubTab === 'active' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {activeOrders.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOrdersSubTab('history')}
+                      className={`flex-1 pb-2.5 text-xs font-bold transition-all border-b-2 text-center flex items-center justify-center gap-1.5 ${
+                        ordersSubTab === 'history'
+                          ? 'border-orange-500 text-orange-600 font-extrabold'
+                          : 'border-transparent text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      <span>Histórico</span>
+                      <span className={`inline-flex items-center justify-center h-4.5 px-1.5 text-[9px] font-black rounded-full transition-colors ${
+                        ordersSubTab === 'history' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {completedOrders.length}
+                      </span>
+                    </button>
+                  </div>
+
+                  {displayedOrders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-8 text-center bg-white/20 rounded-3xl border border-dashed border-gray-200 py-12">
+                      <ShoppingBag className="h-8 w-8 text-gray-300 mb-2.5 animate-pulse" />
+                      <h4 className="font-sans text-xs font-extrabold text-gray-700 mb-0.5">
+                        {ordersSubTab === 'active' ? 'Nenhum Pedido Ativo' : 'Histórico Vazio'}
+                      </h4>
+                      <p className="text-[10px] text-gray-400 max-w-xs">
+                        {ordersSubTab === 'active' 
+                          ? 'Não há pedidos em andamento no momento.' 
+                          : 'Você não possui pedidos finalizados ou recusados.'}
+                      </p>
+                    </div>
+                  ) : (
+                    displayedOrders.map((order) => {
                     const statusInfo = getOrderStatusInfo(order.status, order.statusEntrega);
                     const isExpanded = expandedOrderId === order.id;
 
@@ -563,74 +623,90 @@ export default function MyOrders() {
 
                         {/* Real-time Order Tracking Status Progress */}
                         <div className="px-4 pb-4 bg-white/20 border-t border-white/10">
-                          <p className="text-[8px] text-gray-400 uppercase font-extrabold tracking-wider pt-3 pb-2">Status do Pedido</p>
-                          
-                          {/* Visual Progress Bar */}
-                          <div className="relative flex items-center justify-between w-full px-4 mt-2">
-                            {/* Grey background track line */}
-                            <div className="absolute top-3 left-6 right-6 h-0.5 bg-gray-200 z-0"></div>
-                            
-                            {/* Colored active track line */}
-                            <div 
-                              className="absolute top-3 left-6 h-0.5 bg-orange-500 transition-all duration-500 z-0"
-                              style={{ 
-                                width: statusInfo.step === 4 ? 'calc(100% - 3rem)' : 
-                                       statusInfo.step === 3.5 ? '75%' : 
-                                       statusInfo.step === 3 ? '66%' : 
-                                       statusInfo.step === 2 ? '33%' : '0%' 
-                              }}
-                            ></div>
-
-                            {/* Step 1: Recebido */}
-                            <div className="relative flex flex-col items-center z-10">
-                              <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                statusInfo.step >= 1 
-                                  ? 'bg-orange-500 text-white ring-4 ring-orange-100' 
-                                  : 'bg-white border border-gray-200 text-gray-400'
-                              }`}>
-                                <Package className="h-3.5 w-3.5" />
+                          {order.status === 'refused' ? (
+                            <div className="mt-3 p-3.5 bg-rose-50 border border-rose-100 rounded-2xl flex items-start gap-2.5 text-rose-700 animate-pulse">
+                              <AlertCircle className="h-5 w-5 shrink-0 text-rose-600 mt-0.5" />
+                              <div className="flex-1">
+                                <p className="text-xs font-bold uppercase tracking-wider text-rose-800">Pedido Recusado pelo Restaurante</p>
+                                {order.motivoRecusa && (
+                                  <p className="text-xs font-semibold text-rose-600 mt-1 leading-relaxed">
+                                    <strong>Motivo:</strong> {order.motivoRecusa}
+                                  </p>
+                                )}
                               </div>
-                              <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">Recebido</span>
                             </div>
+                          ) : (
+                            <>
+                              <p className="text-[8px] text-gray-400 uppercase font-extrabold tracking-wider pt-3 pb-2">Status do Pedido</p>
+                              
+                              {/* Visual Progress Bar */}
+                              <div className="relative flex items-center justify-between w-full px-4 mt-2">
+                                {/* Grey background track line */}
+                                <div className="absolute top-3 left-6 right-6 h-0.5 bg-gray-200 z-0"></div>
+                                
+                                {/* Colored active track line */}
+                                <div 
+                                  className="absolute top-3 left-6 h-0.5 bg-orange-500 transition-all duration-500 z-0"
+                                  style={{ 
+                                    width: statusInfo.step === 4 ? 'calc(100% - 3rem)' : 
+                                           statusInfo.step === 3.5 ? '75%' : 
+                                           statusInfo.step === 3 ? '66%' : 
+                                           statusInfo.step === 2 ? '33%' : '0%' 
+                                  }}
+                                ></div>
 
-                            {/* Step 2: Preparação */}
-                            <div className="relative flex flex-col items-center z-10">
-                              <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                statusInfo.step >= 2 
-                                  ? 'bg-orange-500 text-white ring-4 ring-orange-100' 
-                                  : 'bg-white border border-gray-200 text-gray-400'
-                              }`}>
-                                <Clock3 className="h-3.5 w-3.5" />
-                              </div>
-                              <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">Preparo</span>
-                            </div>
+                                {/* Step 1: Recebido */}
+                                <div className="relative flex flex-col items-center z-10">
+                                  <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                    statusInfo.step >= 1 
+                                      ? 'bg-orange-500 text-white ring-4 ring-orange-100' 
+                                      : 'bg-white border border-gray-200 text-gray-400'
+                                  }`}>
+                                    <Package className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">Recebido</span>
+                                </div>
 
-                            {/* Step 3: Pronto ou A caminho */}
-                            <div className="relative flex flex-col items-center z-10">
-                              <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                statusInfo.step >= 3 
-                                  ? 'bg-orange-500 text-white ring-4 ring-orange-100' 
-                                  : 'bg-white border border-gray-200 text-gray-400'
-                              }`}>
-                                {order.tipoPedido === 'entrega' ? <Bike className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
-                              </div>
-                              <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">
-                                {statusInfo.step === 3.5 ? 'A Caminho' : order.tipoPedido === 'entrega' ? 'Despachado' : 'Pronto'}
-                              </span>
-                            </div>
+                                {/* Step 2: Preparação */}
+                                <div className="relative flex flex-col items-center z-10">
+                                  <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                    statusInfo.step >= 2 
+                                      ? 'bg-orange-500 text-white ring-4 ring-orange-100' 
+                                      : 'bg-white border border-gray-200 text-gray-400'
+                                  }`}>
+                                    <Clock3 className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">Preparo</span>
+                                </div>
 
-                            {/* Step 4: Entregue */}
-                            <div className="relative flex flex-col items-center z-10">
-                              <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                                statusInfo.step >= 4 
-                                  ? 'bg-emerald-500 text-white ring-4 ring-emerald-100' 
-                                  : 'bg-white border border-gray-200 text-gray-400'
-                              }`}>
-                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {/* Step 3: Pronto ou A caminho */}
+                                <div className="relative flex flex-col items-center z-10">
+                                  <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                    statusInfo.step >= 3 
+                                      ? 'bg-orange-500 text-white ring-4 ring-orange-100' 
+                                      : 'bg-white border border-gray-200 text-gray-400'
+                                  }`}>
+                                    {order.tipoPedido === 'entrega' ? <Bike className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
+                                  </div>
+                                  <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">
+                                    {statusInfo.step === 3.5 ? 'A Caminho' : order.tipoPedido === 'entrega' ? 'Despachado' : 'Pronto'}
+                                  </span>
+                                </div>
+
+                                {/* Step 4: Entregue */}
+                                <div className="relative flex flex-col items-center z-10">
+                                  <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                    statusInfo.step >= 4 
+                                      ? 'bg-emerald-500 text-white ring-4 ring-emerald-100' 
+                                      : 'bg-white border border-gray-200 text-gray-400'
+                                  }`}>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                  </div>
+                                  <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">Concluído</span>
+                                </div>
                               </div>
-                              <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">Concluído</span>
-                            </div>
-                          </div>
+                            </>
+                          )}
                         </div>
 
                         {/* Expanded Items & Address */}
@@ -701,18 +777,16 @@ export default function MyOrders() {
                                 )}
 
                                 {/* Real-time chat integration */}
-                                {order.tipoPedido === 'entrega' && order.motoboyId && order.status !== 'delivered' && order.statusEntrega !== 'entregue' && (
-                                  <button
-                                    type="button"
+                                {order.tipoPedido === 'entrega' && order.motoboyId && (
+                                  <ChatButtonWithBadge
+                                    orderId={order.id}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setSelectedChatOrder(order);
                                     }}
-                                    className="w-full h-11 mt-3 rounded-2xl bg-orange-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-orange-700 transition shadow-md shadow-orange-500/10 active:scale-95 animate-fade-in"
-                                  >
-                                    <MessageSquare className="h-4 w-4" />
-                                    <span>Conversar com o Entregador (Chat)</span>
-                                  </button>
+                                    variant="filled"
+                                    size="full"
+                                  />
                                 )}
                               </div>
                             </motion.div>
@@ -720,7 +794,8 @@ export default function MyOrders() {
                         </AnimatePresence>
                       </div>
                     );
-                  })}
+                  })
+                  )}
                 </div>
               )}
             </motion.div>

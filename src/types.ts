@@ -22,7 +22,7 @@ export interface OrderItem {
   price: number;
 }
 
-export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'delivered';
+export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'delivered' | 'refused';
 
 export interface Address {
   cep: string;
@@ -85,6 +85,7 @@ export interface Order {
   motoboyId?: string;
   statusEntrega?: 'aceito' | 'a_caminho' | 'entregue';
   horarioEntrega?: string;
+  motivoRecusa?: string;
 }
 
 export interface Coupon {
