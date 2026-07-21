@@ -20,11 +20,13 @@ import {
   Sparkles,
   ArrowRight,
   ClipboardList,
-  MessageSquare
+  MessageSquare,
+  PackageCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import OrderChatModal from '../components/OrderChatModal';
 import ChatButtonWithBadge from '../components/ChatButtonWithBadge';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 export default function Motoboy() {
   const { user, profile, updateProfile, setIsAuthOpen } = useAuth();
@@ -32,6 +34,17 @@ export default function Motoboy() {
   const [activeTab, setActiveTab] = useState<'available' | 'active' | 'history'>('available');
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedChatOrder, setSelectedChatOrder] = useState<any | null>(null);
+
+  // Modal de Confirmação para Ações do Motoboy
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    orderId: string;
+    actionType: 'accept' | 'pickup' | 'start_delivery' | 'complete_delivery';
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'orange' | 'blue' | 'amber' | 'emerald';
+  } | null>(null);
 
   // 1. Authorization Check
   if (!user) {
@@ -109,54 +122,39 @@ export default function Motoboy() {
     }
   };
 
-  // Accept Order
-  const handleAcceptOrder = async (orderId: string) => {
+  // Execute Confirmed Motoboy Action
+  const handleConfirmAction = async () => {
+    if (!confirmModal) return;
     setIsUpdating(true);
+    const { orderId, actionType } = confirmModal;
     try {
-      await updateOrder(orderId, {
-        motoboyId: user.uid,
-        statusEntrega: 'aceito'
-      });
-      setActiveTab('active');
+      if (actionType === 'accept') {
+        await updateOrder(orderId, {
+          motoboyId: user.uid,
+          statusEntrega: 'aceito'
+        });
+        setActiveTab('active');
+      } else if (actionType === 'pickup') {
+        await updateOrder(orderId, {
+          statusEntrega: 'retirado'
+        });
+      } else if (actionType === 'start_delivery') {
+        await updateOrder(orderId, {
+          statusEntrega: 'a_caminho'
+        });
+      } else if (actionType === 'complete_delivery') {
+        await updateOrder(orderId, {
+          status: 'delivered',
+          statusEntrega: 'entregue',
+          horarioEntrega: new Date().toISOString()
+        });
+        setActiveTab('history');
+      }
     } catch (e) {
-      console.error('Error accepting order:', e);
+      console.error('Error executing motoboy status change:', e);
     } finally {
       setIsUpdating(false);
-    }
-  };
-
-  // Start Delivery (A Caminho)
-  const handleStartDelivery = async (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order || order.status !== 'ready') {
-      return;
-    }
-    setIsUpdating(true);
-    try {
-      await updateOrder(orderId, {
-        statusEntrega: 'a_caminho'
-      });
-    } catch (e) {
-      console.error('Error starting delivery:', e);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  // Complete Delivery (Entregue)
-  const handleCompleteDelivery = async (orderId: string) => {
-    setIsUpdating(true);
-    try {
-      await updateOrder(orderId, {
-        status: 'delivered',
-        statusEntrega: 'entregue',
-        horarioEntrega: new Date().toISOString()
-      });
-      setActiveTab('history');
-    } catch (e) {
-      console.error('Error completing delivery:', e);
-    } finally {
-      setIsUpdating(false);
+      setConfirmModal(null);
     }
   };
 
@@ -338,9 +336,19 @@ export default function Motoboy() {
                       </div>
 
                       <button
-                        onClick={() => handleAcceptOrder(order.id)}
+                        onClick={() => {
+                          setConfirmModal({
+                            isOpen: true,
+                            orderId: order.id,
+                            actionType: 'accept',
+                            title: 'Aceitar Entrega',
+                            message: `Você deseja aceitar e se responsabilizar pela entrega do Pedido #${order.id}?`,
+                            confirmLabel: 'Aceitar Pedido',
+                            variant: 'orange'
+                          });
+                        }}
                         disabled={isUpdating}
-                        className="rounded-2xl bg-orange-600 px-5 py-3 text-xs font-bold text-white hover:bg-orange-700 transition flex items-center gap-1 shadow-md shadow-orange-600/15 active:scale-95 disabled:opacity-50"
+                        className="rounded-2xl bg-orange-600 px-5 py-3 text-xs font-bold text-white hover:bg-orange-700 transition flex items-center gap-1.5 shadow-md shadow-orange-600/15 active:scale-95 disabled:opacity-50 cursor-pointer"
                       >
                         <span>Aceitar Pedido</span>
                         <ArrowRight className="h-4 w-4" />
@@ -372,8 +380,19 @@ export default function Motoboy() {
                   ? order.endereco 
                   : `${order.endereco.street}, ${order.endereco.number} - ${order.endereco.neighborhood}, ${order.endereco.city}`;
 
-                const isAccepted = order.statusEntrega === 'aceito';
-                const isEnRoute = order.statusEntrega === 'a_caminho';
+                const isAceito = !order.statusEntrega || order.statusEntrega === 'aceito';
+                const isRetirado = order.statusEntrega === 'retirado';
+                const isACaminho = order.statusEntrega === 'a_caminho';
+
+                let badgeLabel = 'Aceito (Aguardando Retirada)';
+                let badgeClass = 'bg-blue-100 text-blue-800';
+                if (isRetirado) {
+                  badgeLabel = 'Retirado no Restaurante';
+                  badgeClass = 'bg-purple-100 text-purple-800';
+                } else if (isACaminho) {
+                  badgeLabel = 'Em Rota de Entrega';
+                  badgeClass = 'bg-amber-100 text-amber-800';
+                }
 
                 return (
                   <motion.div
@@ -387,10 +406,8 @@ export default function Motoboy() {
                         <span className="text-xs font-extrabold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-xl">
                           {order.id}
                         </span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                          isEnRoute ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
-                          {isEnRoute ? 'A Caminho' : 'Aceito'}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${badgeClass}`}>
+                          {badgeLabel}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-[11px] font-bold text-gray-400">
@@ -479,27 +496,63 @@ export default function Motoboy() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-3 mt-1">
-                        {isAccepted ? (
-                          order.status !== 'ready' ? (
-                            <div className="col-span-2 rounded-2xl bg-gray-50 border border-gray-200/60 py-3.5 text-xs font-bold text-gray-400 flex items-center justify-center gap-1.5 cursor-not-allowed select-none">
-                              <Clock className="h-4 w-4 animate-spin" style={{ animationDuration: '3s' }} />
-                              <span>Aguardando preparo do restaurante...</span>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleStartDelivery(order.id)}
-                              disabled={isUpdating}
-                              className="col-span-2 rounded-2xl bg-amber-500 py-3.5 text-xs font-bold text-white hover:bg-amber-600 transition shadow-md shadow-amber-500/10 flex items-center justify-center gap-1.5 active:scale-95"
-                            >
-                              <Navigation className="h-4 w-4 animate-pulse" />
-                              <span>Iniciar Entrega (Saiu p/ entrega)</span>
-                            </button>
-                          )
-                        ) : (
+                        {isAceito && (
                           <button
-                            onClick={() => handleCompleteDelivery(order.id)}
+                            onClick={() => {
+                              setConfirmModal({
+                                isOpen: true,
+                                orderId: order.id,
+                                actionType: 'pickup',
+                                title: 'Confirmar Retirada',
+                                message: `Confirma que você já retirou o Pedido #${order.id} no restaurante?`,
+                                confirmLabel: 'Confirmar Retirada',
+                                variant: 'blue'
+                              });
+                            }}
                             disabled={isUpdating}
-                            className="col-span-2 rounded-2xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5 active:scale-95"
+                            className="col-span-2 rounded-2xl bg-blue-600 py-3.5 text-xs font-bold text-white hover:bg-blue-700 transition shadow-md shadow-blue-600/10 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer disabled:opacity-50"
+                          >
+                            <ShoppingBag className="h-4 w-4" />
+                            <span>Confirmar Retirada (Retirado no Restaurante)</span>
+                          </button>
+                        )}
+
+                        {isRetirado && (
+                          <button
+                            onClick={() => {
+                              setConfirmModal({
+                                isOpen: true,
+                                orderId: order.id,
+                                actionType: 'start_delivery',
+                                title: 'Confirmar Saída para Entrega',
+                                message: `Confirma que saiu do restaurante e está em rota para entregar o Pedido #${order.id}?`,
+                                confirmLabel: 'Confirmar Saída (Em Rota)',
+                                variant: 'amber'
+                              });
+                            }}
+                            disabled={isUpdating}
+                            className="col-span-2 rounded-2xl bg-amber-500 py-3.5 text-xs font-bold text-white hover:bg-amber-600 transition shadow-md shadow-amber-500/10 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer disabled:opacity-50"
+                          >
+                            <Navigation className="h-4 w-4 animate-pulse" />
+                            <span>Iniciar Entrega (Saiu p/ entrega)</span>
+                          </button>
+                        )}
+
+                        {isACaminho && (
+                          <button
+                            onClick={() => {
+                              setConfirmModal({
+                                isOpen: true,
+                                orderId: order.id,
+                                actionType: 'complete_delivery',
+                                title: 'Finalizar Entrega',
+                                message: `Confirma que o Pedido #${order.id} foi entregue com sucesso ao cliente?`,
+                                confirmLabel: 'Finalizar Entrega',
+                                variant: 'emerald'
+                              });
+                            }}
+                            disabled={isUpdating}
+                            className="col-span-2 rounded-2xl bg-emerald-600 py-3.5 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-md shadow-emerald-600/10 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer disabled:opacity-50"
                           >
                             <CheckCircle2 className="h-4 w-4" />
                             <span>Finalizar Entrega (Entregue)</span>
@@ -600,6 +653,19 @@ export default function Motoboy() {
           customerName={selectedChatOrder.customerName}
           isOpen={!!selectedChatOrder}
           onClose={() => setSelectedChatOrder(null)}
+        />
+      )}
+
+      {confirmModal && (
+        <ConfirmationModal
+          isOpen={confirmModal.isOpen}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmLabel={confirmModal.confirmLabel}
+          variant={confirmModal.variant}
+          isLoading={isUpdating}
+          onConfirm={handleConfirmAction}
+          onCancel={() => setConfirmModal(null)}
         />
       )}
     </div>

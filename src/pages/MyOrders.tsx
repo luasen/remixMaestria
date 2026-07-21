@@ -123,7 +123,13 @@ export default function MyOrders() {
     }
     if (status === 'ready') {
       if (statusEntrega === 'a_caminho') {
-        return { label: 'A Caminho', color: 'bg-indigo-50 text-indigo-700 border-indigo-100', step: 3.5 };
+        return { label: 'Saiu p/ Entrega (Em Rota)', color: 'bg-indigo-50 text-indigo-700 border-indigo-100', step: 3.8 };
+      }
+      if (statusEntrega === 'retirado') {
+        return { label: 'Retirado p/ Entrega', color: 'bg-purple-50 text-purple-700 border-purple-100', step: 3.4 };
+      }
+      if (statusEntrega === 'aceito') {
+        return { label: 'Motoboy Aceitou', color: 'bg-blue-50 text-blue-700 border-blue-100', step: 3.2 };
       }
       return { label: 'Pronto p/ Retirada/Entrega', color: 'bg-blue-50 text-blue-700 border-blue-100', step: 3 };
     }

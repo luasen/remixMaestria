@@ -49,6 +49,7 @@ import restaurantBanner from '../assets/images/restaurant_banner_1783985102418.j
 import OrderChatModal from '../components/OrderChatModal';
 import ChatButtonWithBadge from '../components/ChatButtonWithBadge';
 import AdminChatDashboard from '../components/AdminChatDashboard';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 type AdminTab = 'orders' | 'products' | 'categories' | 'settings' | 'employees' | 'systemSettings' | 'chats';
 
@@ -75,6 +76,29 @@ export default function Admin() {
   const { user, profile, loading, setIsAuthOpen } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>('orders');
   const [selectedChatOrder, setSelectedChatOrder] = useState<any | null>(null);
+  const [confirmStatusModal, setConfirmStatusModal] = useState<{
+    isOpen: boolean;
+    orderId: string;
+    targetStatus: OrderStatus;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    variant: 'orange' | 'blue' | 'emerald' | 'rose' | 'amber';
+  } | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  const handleConfirmStatusChange = async () => {
+    if (!confirmStatusModal) return;
+    setIsUpdatingStatus(true);
+    try {
+      await updateOrderStatus(confirmStatusModal.orderId, confirmStatusModal.targetStatus);
+    } catch (e) {
+      console.error('Error updating order status:', e);
+    } finally {
+      setIsUpdatingStatus(false);
+      setConfirmStatusModal(null);
+    }
+  };
 
   // --- EMPLOYEES MANAGEMENT STATE ---
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
@@ -758,7 +782,17 @@ export default function Admin() {
                         {order.status === 'pending' && (
                           <div className="flex-1 flex gap-2 w-full">
                             <button
-                              onClick={() => updateOrderStatus(order.id, 'preparing')}
+                              onClick={() => {
+                                setConfirmStatusModal({
+                                  isOpen: true,
+                                  orderId: order.id,
+                                  targetStatus: 'preparing',
+                                  title: 'Aceitar e Preparar Pedido',
+                                  message: `Deseja aceitar o Pedido #${order.id} e alterar o status para "Em Preparo"?`,
+                                  confirmLabel: 'Aceitar e Preparar',
+                                  variant: 'orange'
+                                });
+                              }}
                               id={`btn-status-preparing-${order.id}`}
                               className="flex-1 flex items-center justify-center gap-1 bg-orange-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-orange-700 transition"
                             >
@@ -793,7 +827,17 @@ export default function Admin() {
                         )}
                         {order.status === 'preparing' && (
                           <button
-                            onClick={() => updateOrderStatus(order.id, 'ready')}
+                            onClick={() => {
+                              setConfirmStatusModal({
+                                isOpen: true,
+                                orderId: order.id,
+                                targetStatus: 'ready',
+                                title: 'Marcar Pedido como Pronto',
+                                message: `Deseja alterar o status do Pedido #${order.id} para "Pronto"? O pedido ficará disponível para os motoboys para entrega.`,
+                                confirmLabel: 'Marcar como Pronto',
+                                variant: 'blue'
+                              });
+                            }}
                             id={`btn-status-ready-${order.id}`}
                             className="flex-1 flex items-center justify-center gap-1 bg-blue-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-blue-700 transition"
                           >
@@ -803,7 +847,17 @@ export default function Admin() {
                         )}
                         {order.status === 'ready' && (
                           <button
-                            onClick={() => updateOrderStatus(order.id, 'delivered')}
+                            onClick={() => {
+                              setConfirmStatusModal({
+                                isOpen: true,
+                                orderId: order.id,
+                                targetStatus: 'delivered',
+                                title: 'Finalizar Pedido',
+                                message: `Deseja finalizar e marcar o Pedido #${order.id} como "Entregue"?`,
+                                confirmLabel: 'Marcar como Entregue',
+                                variant: 'emerald'
+                              });
+                            }}
                             id={`btn-status-delivered-${order.id}`}
                             className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-emerald-700 transition"
                           >
@@ -2726,6 +2780,19 @@ export default function Admin() {
           customerName={selectedChatOrder.customerName}
           isOpen={!!selectedChatOrder}
           onClose={() => setSelectedChatOrder(null)}
+        />
+      )}
+
+      {confirmStatusModal && (
+        <ConfirmationModal
+          isOpen={confirmStatusModal.isOpen}
+          title={confirmStatusModal.title}
+          message={confirmStatusModal.message}
+          confirmLabel={confirmStatusModal.confirmLabel}
+          variant={confirmStatusModal.variant}
+          isLoading={isUpdatingStatus}
+          onConfirm={handleConfirmStatusChange}
+          onCancel={() => setConfirmStatusModal(null)}
         />
       )}
     </div>

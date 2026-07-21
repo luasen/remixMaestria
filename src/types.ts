@@ -83,7 +83,7 @@ export interface Order {
 
   // New Motoboy Phase 2 Fields
   motoboyId?: string;
-  statusEntrega?: 'aceito' | 'a_caminho' | 'entregue';
+  statusEntrega?: 'aceito' | 'retirado' | 'a_caminho' | 'entregue';
   horarioEntrega?: string;
   motivoRecusa?: string;
 }
