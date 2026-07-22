@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import AuthModal from './components/AuthModal';
+import MotoboyOrderNotification from './components/MotoboyOrderNotification';
 import Home from './pages/Home';
 import Menu from './pages/Menu';
 import Cart from './pages/Cart';
@@ -138,6 +139,9 @@ function AppContent() {
 
       {/* Persistent Bottom Nav */}
       <BottomNav />
+
+      {/* Motoboy Real-time Delivery Order Popup */}
+      <MotoboyOrderNotification />
 
       {/* Auth Modal overlay at absolute top layer */}
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />

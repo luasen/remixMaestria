@@ -369,14 +369,14 @@ export default function Motoboy() {
                             actionType: 'accept',
                             title: 'Aceitar Entrega',
                             message: `Você deseja aceitar e se responsabilizar pela entrega do Pedido #${order.id}?`,
-                            confirmLabel: 'Aceitar Pedido',
+                            confirmLabel: 'Aceitar Entrega',
                             variant: 'orange'
                           });
                         }}
                         disabled={isUpdating}
-                        className="rounded-2xl bg-orange-600 px-5 py-3 text-xs font-bold text-white hover:bg-orange-700 transition flex items-center gap-1.5 shadow-md shadow-orange-600/15 active:scale-95 disabled:opacity-50 cursor-pointer"
+                        className="rounded-2xl bg-gradient-to-r from-orange-600 to-amber-600 px-5 py-3 text-xs font-black text-white hover:from-orange-700 hover:to-amber-700 transition flex items-center gap-1.5 shadow-md shadow-orange-600/20 active:scale-95 disabled:opacity-50 cursor-pointer"
                       >
-                        <span>Aceitar Pedido</span>
+                        <span>Aceitar Entrega</span>
                         <ArrowRight className="h-4 w-4" />
                       </button>
                     </div>
