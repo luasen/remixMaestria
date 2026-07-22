@@ -116,27 +116,27 @@ export default function MyOrders() {
 
   const getOrderStatusInfo = (status: string, statusEntrega?: string) => {
     if (status === 'refused') {
-      return { label: 'Recusado', color: 'bg-rose-50 text-rose-700 border-rose-100', step: 0 };
+      return { label: 'Pedido Recusado', color: 'bg-rose-50 text-rose-700 border-rose-100', step: 0 };
     }
-    if (status === 'delivered') {
-      return { label: 'Entregue / Finalizado', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', step: 4 };
+    if (status === 'delivered' || statusEntrega === 'entregue') {
+      return { label: 'Pedido Entregue e Concluído', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', step: 4 };
     }
     if (status === 'ready') {
       if (statusEntrega === 'a_caminho') {
-        return { label: 'Saiu p/ Entrega (Em Rota)', color: 'bg-indigo-50 text-indigo-700 border-indigo-100', step: 3.8 };
+        return { label: 'Saiu para Entrega (Em Rota)', color: 'bg-amber-50 text-amber-800 border-amber-200', step: 3.5 };
       }
       if (statusEntrega === 'retirado') {
-        return { label: 'Retirado p/ Entrega', color: 'bg-purple-50 text-purple-700 border-purple-100', step: 3.4 };
+        return { label: 'Retirado pelo Motoboy', color: 'bg-purple-50 text-purple-700 border-purple-200', step: 3.2 };
       }
       if (statusEntrega === 'aceito') {
-        return { label: 'Motoboy Aceitou', color: 'bg-blue-50 text-blue-700 border-blue-100', step: 3.2 };
+        return { label: 'Motoboy Aceitou (A caminho do restaurante)', color: 'bg-blue-50 text-blue-700 border-blue-200', step: 3.1 };
       }
-      return { label: 'Pronto p/ Retirada/Entrega', color: 'bg-blue-50 text-blue-700 border-blue-100', step: 3 };
+      return { label: 'Pronto / Aguardando Motoboy', color: 'bg-blue-50 text-blue-700 border-blue-200', step: 3 };
     }
     if (status === 'preparing') {
-      return { label: 'Em Preparação', color: 'bg-amber-50 text-amber-700 border-amber-100', step: 2 };
+      return { label: 'Em Preparação', color: 'bg-amber-50 text-amber-700 border-amber-200', step: 2 };
     }
-    return { label: 'Recebido', color: 'bg-red-50 text-red-700 border-red-100', step: 1 };
+    return { label: 'Pedido Recebido', color: 'bg-orange-50 text-orange-700 border-orange-200', step: 1 };
   };
 
   const toggleExpandOrder = (id: string) => {
@@ -654,10 +654,10 @@ export default function MyOrders() {
                                 <div 
                                   className="absolute top-3 left-6 h-0.5 bg-orange-500 transition-all duration-500 z-0"
                                   style={{ 
-                                    width: statusInfo.step === 4 ? 'calc(100% - 3rem)' : 
-                                           statusInfo.step === 3.5 ? '75%' : 
-                                           statusInfo.step === 3 ? '66%' : 
-                                           statusInfo.step === 2 ? '33%' : '0%' 
+                                    width: statusInfo.step >= 4 ? 'calc(100% - 3rem)' : 
+                                           statusInfo.step >= 3.5 ? '75%' : 
+                                           statusInfo.step >= 3 ? '50%' : 
+                                           statusInfo.step >= 2 ? '25%' : '0%' 
                                   }}
                                 ></div>
 
@@ -685,17 +685,17 @@ export default function MyOrders() {
                                   <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">Preparo</span>
                                 </div>
 
-                                {/* Step 3: Pronto ou A caminho */}
+                                {/* Step 3: Pronto ou A Caminho */}
                                 <div className="relative flex flex-col items-center z-10">
                                   <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                                     statusInfo.step >= 3 
                                       ? 'bg-orange-500 text-white ring-4 ring-orange-100' 
                                       : 'bg-white border border-gray-200 text-gray-400'
                                   }`}>
-                                    {order.tipoPedido === 'entrega' ? <Bike className="h-3.5 w-3.5" /> : <Package className="h-3.5 w-3.5" />}
+                                    {statusInfo.step >= 3.5 ? <Bike className="h-3.5 w-3.5 animate-bounce" /> : <Package className="h-3.5 w-3.5" />}
                                   </div>
                                   <span className="text-[8px] font-extrabold uppercase mt-1 text-gray-600">
-                                    {statusInfo.step === 3.5 ? 'A Caminho' : order.tipoPedido === 'entrega' ? 'Despachado' : 'Pronto'}
+                                    {statusInfo.step >= 3.5 ? 'A Caminho' : 'Pronto'}
                                   </span>
                                 </div>
 

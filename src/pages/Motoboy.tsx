@@ -21,7 +21,8 @@ import {
   ArrowRight,
   ClipboardList,
   MessageSquare,
-  PackageCheck
+  PackageCheck,
+  Info
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import OrderChatModal from '../components/OrderChatModal';
@@ -82,27 +83,33 @@ export default function Motoboy() {
   }
 
   // 2. Data Filtering for Motoboy
+  const isManagementRole = profile?.role === 'admin' || profile?.role === 'superadmin';
+
   // Available orders: tipoPedido === 'entrega', no motoboy assigned, status is strictly 'ready' (Pronto)
   const availableOrders = orders.filter(
     (order) => 
       order.tipoPedido === 'entrega' && 
       !order.motoboyId && 
-      order.status === 'ready'
+      order.status === 'ready' &&
+      order.status !== 'refused'
   );
 
-  // Active orders assigned to this motoboy, not yet delivered, and NOT refused by admin
+  // Active orders assigned to this motoboy (or all active if admin/superadmin), strictly ready or delivered, not yet completed/refused
   const activeOrders = orders.filter(
     (order) => 
-      order.motoboyId === user.uid && 
+      order.tipoPedido === 'entrega' && 
+      (order.motoboyId === user.uid || (isManagementRole && Boolean(order.motoboyId))) && 
+      (order.status === 'ready' || order.status === 'delivered') &&
       order.statusEntrega !== 'entregue' && 
       order.status !== 'delivered' &&
       order.status !== 'refused'
   );
 
-  // Completed order history for this motoboy (successfully delivered, excluding refused)
+  // Completed order history for this motoboy (or all completed if admin/superadmin)
   const completedOrders = orders.filter(
     (order) => 
-      order.motoboyId === user.uid && 
+      order.tipoPedido === 'entrega' &&
+      (order.motoboyId === user.uid || isManagementRole) && 
       (order.statusEntrega === 'entregue' || order.status === 'delivered') &&
       order.status !== 'refused'
   );
@@ -129,6 +136,9 @@ export default function Motoboy() {
     const { orderId, actionType } = confirmModal;
     try {
       if (actionType === 'accept') {
+        if (!profile.online) {
+          await updateProfile({ online: true, ultimaAtualizacao: new Date().toISOString() });
+        }
         await updateOrder(orderId, {
           motoboyId: user.uid,
           statusEntrega: 'aceito'
@@ -259,30 +269,46 @@ export default function Motoboy() {
         {/* --- 1. AVAILABLE ORDERS TAB --- */}
         {activeTab === 'available' && (
           <div className="flex flex-col gap-4">
-            {!profile.online ? (
-              <div className="rounded-3xl border border-dashed border-gray-200 p-8 text-center bg-white shadow-sm mt-4">
-                <div className="rounded-full bg-gray-100 p-3.5 inline-block text-gray-400 mb-3">
-                  <Power className="h-6 w-6" />
+            {/* Instruction Banner for Available Tab */}
+            <div className="rounded-2xl bg-orange-50/80 border border-orange-200/80 p-3.5 shadow-sm">
+              <div className="flex items-start gap-2.5">
+                <div className="rounded-xl bg-orange-100 p-2 text-orange-600 shrink-0 mt-0.5">
+                  <Info className="h-4.5 w-4.5" />
                 </div>
-                <h3 className="font-bold text-gray-700 text-sm mb-1">Você está Offline</h3>
-                <p className="text-xs text-gray-400 max-w-xs mx-auto mb-4">
-                  Fique online para poder visualizar e aceitar novos pedidos disponíveis para entrega.
-                </p>
+                <div>
+                  <h4 className="text-xs font-extrabold text-orange-950 uppercase tracking-wider">
+                    📋 Instruções de Entrega (Pedidos Prontos)
+                  </h4>
+                  <p className="text-xs text-orange-800 mt-1 leading-relaxed">
+                    Aqui aparecem apenas os pedidos que o restaurante marcou como <strong>"Pronto"</strong>. Confira os dados do cliente e clique em <strong>"Aceitar Pedido"</strong> para assumir a corrida.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {!profile.online && (
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 flex items-center justify-between gap-3 shadow-sm mb-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-800">
+                  <Power className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>Você está <strong>Offline</strong>. Fique online para ser notificado de novos pedidos.</span>
+                </div>
                 <button
                   onClick={handleToggleOnline}
-                  className="rounded-2xl bg-orange-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-orange-700 transition shadow-md shadow-orange-600/10"
+                  className="shrink-0 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 transition active:scale-95 cursor-pointer"
                 >
-                  Ficar Online Agora
+                  Ficar Online
                 </button>
               </div>
-            ) : availableOrders.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-gray-200 p-8 text-center bg-white shadow-sm mt-4">
+            )}
+
+            {availableOrders.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-gray-200 p-8 text-center bg-white shadow-sm mt-2">
                 <div className="rounded-full bg-orange-50 p-3.5 inline-block text-orange-500 mb-3 animate-pulse">
                   <ClipboardList className="h-6 w-6" />
                 </div>
-                <h3 className="font-bold text-gray-700 text-sm mb-1">Nenhum pedido disponível</h3>
-                <p className="text-xs text-gray-400 max-w-xs mx-auto">
-                  Aguardando novos pedidos de entrega entrarem no sistema...
+                <h3 className="font-bold text-gray-700 text-sm mb-1">Nenhum pedido disponível para entrega</h3>
+                <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                  Para um pedido aparecer aqui, o cliente deve solicitar <strong>Entrega</strong> e o restaurante deve alterar o status do pedido para <strong>"Pronto"</strong> no painel de administração.
                 </p>
               </div>
             ) : (
@@ -304,7 +330,7 @@ export default function Motoboy() {
                       </span>
                       <div className="flex items-center gap-1 text-[11px] font-bold text-gray-400">
                         <Clock className="h-3.5 w-3.5 text-gray-400" />
-                        <span>{order.horarioPedido || 'Pendente'}</span>
+                        <span>{order.horarioPedido || 'Pronto'}</span>
                       </div>
                     </div>
 
@@ -364,8 +390,25 @@ export default function Motoboy() {
         {/* --- 2. ACTIVE ORDERS TAB --- */}
         {activeTab === 'active' && (
           <div className="flex flex-col gap-4">
+            {/* Instruction Banner for Active Tab */}
+            <div className="rounded-2xl bg-blue-50/80 border border-blue-200/80 p-3.5 shadow-sm">
+              <div className="flex items-start gap-2.5">
+                <div className="rounded-xl bg-blue-100 p-2 text-blue-600 shrink-0 mt-0.5">
+                  <Bike className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-extrabold text-blue-950 uppercase tracking-wider">
+                    🏍️ Passo a Passo da Entrega Em Andamento
+                  </h4>
+                  <p className="text-xs text-blue-800 mt-1 leading-relaxed">
+                    Siga a sequência de botões em cada pedido: <strong>1. Confirmar Retirada</strong> ➔ <strong>2. Iniciar Entrega</strong> ➔ <strong>3. Finalizar Entrega</strong> ao entregar para o cliente.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {activeOrders.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-gray-200 p-8 text-center bg-white shadow-sm mt-4">
+              <div className="rounded-3xl border border-dashed border-gray-200 p-8 text-center bg-white shadow-sm mt-2">
                 <div className="rounded-full bg-blue-50 p-3.5 inline-block text-blue-500 mb-3">
                   <Bike className="h-6 w-6" />
                 </div>
@@ -412,7 +455,7 @@ export default function Motoboy() {
                       </div>
                       <div className="flex items-center gap-1 text-[11px] font-bold text-gray-400">
                         <Clock className="h-3.5 w-3.5 text-gray-400" />
-                        <span>{order.horarioPedido || 'Pendente'}</span>
+                        <span>{order.horarioPedido || 'Em Andamento'}</span>
                       </div>
                     </div>
 
@@ -494,6 +537,34 @@ export default function Motoboy() {
                           </span>
                         </div>
                       </div>
+
+                      {/* Explicit Step-by-Step Guidance Box */}
+                      {isAceito && (
+                        <div className="rounded-2xl bg-blue-50 border border-blue-200/80 p-3 flex items-start gap-2 text-xs text-blue-900">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">1</span>
+                          <p className="leading-snug">
+                            <strong>Instrução Passo 1:</strong> Retire o pacote na cozinha do restaurante e clique no botão azul abaixo para confirmar a retirada.
+                          </p>
+                        </div>
+                      )}
+
+                      {isRetirado && (
+                        <div className="rounded-2xl bg-amber-50 border border-amber-200/80 p-3 flex items-start gap-2 text-xs text-amber-900">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-600 text-[10px] font-bold text-white">2</span>
+                          <p className="leading-snug">
+                            <strong>Instrução Passo 2:</strong> Pedido em mãos! Monte na moto e clique no botão amarelo abaixo ao sair em direção ao cliente.
+                          </p>
+                        </div>
+                      )}
+
+                      {isACaminho && (
+                        <div className="rounded-2xl bg-emerald-50 border border-emerald-200/80 p-3 flex items-start gap-2 text-xs text-emerald-900">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">3</span>
+                          <p className="leading-snug">
+                            <strong>Instrução Passo 3:</strong> Você está no caminho do cliente. Ao entregar e receber o pagamento, clique no botão verde para finalizar.
+                          </p>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-2 gap-3 mt-1">
                         {isAceito && (
