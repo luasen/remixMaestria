@@ -22,6 +22,7 @@ export default function MotoboyOrderNotification() {
     (order) => 
       order.tipoPedido === 'entrega' && 
       !order.motoboyId && 
+      !order.statusEntrega &&
       order.status === 'ready' && 
       order.status !== 'refused'
   );
@@ -98,6 +99,15 @@ export default function MotoboyOrderNotification() {
 
   const handleAcceptDelivery = async () => {
     if (!activeNotificationOrder || !user) return;
+
+    // Check if another motoboy accepted it first
+    const currentOrder = orders.find(o => o.id === activeNotificationOrder.id);
+    if (currentOrder?.motoboyId && currentOrder.motoboyId !== user.uid) {
+      alert('Aviso: Este pedido já foi aceito por outro motoboy!');
+      setActiveNotificationOrder(null);
+      return;
+    }
+
     setIsAccepting(true);
     try {
       // 1. If motoboy is offline, set online automatically

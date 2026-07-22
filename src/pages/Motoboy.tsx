@@ -83,33 +83,33 @@ export default function Motoboy() {
   }
 
   // 2. Data Filtering for Motoboy
-  const isManagementRole = profile?.role === 'admin' || profile?.role === 'superadmin';
 
-  // Available orders: tipoPedido === 'entrega', no motoboy assigned, status is strictly 'ready' (Pronto)
+  // Available orders: tipoPedido === 'entrega', no motoboy assigned, no statusEntrega set, status is strictly 'ready' (Pronto)
   const availableOrders = orders.filter(
     (order) => 
       order.tipoPedido === 'entrega' && 
       !order.motoboyId && 
+      !order.statusEntrega &&
       order.status === 'ready' &&
       order.status !== 'refused'
   );
 
-  // Active orders assigned to this motoboy (or all active if admin/superadmin), strictly ready or delivered, not yet completed/refused
+  // Active orders assigned STRICTLY to this motoboy who accepted it first, strictly ready or delivered, not yet completed/refused
   const activeOrders = orders.filter(
     (order) => 
       order.tipoPedido === 'entrega' && 
-      (order.motoboyId === user.uid || (isManagementRole && Boolean(order.motoboyId))) && 
+      order.motoboyId === user.uid && 
       (order.status === 'ready' || order.status === 'delivered') &&
       order.statusEntrega !== 'entregue' && 
       order.status !== 'delivered' &&
       order.status !== 'refused'
   );
 
-  // Completed order history for this motoboy (or all completed if admin/superadmin)
+  // Completed order history STRICTLY for this motoboy
   const completedOrders = orders.filter(
     (order) => 
       order.tipoPedido === 'entrega' &&
-      (order.motoboyId === user.uid || isManagementRole) && 
+      order.motoboyId === user.uid && 
       (order.statusEntrega === 'entregue' || order.status === 'delivered') &&
       order.status !== 'refused'
   );
@@ -136,6 +136,15 @@ export default function Motoboy() {
     const { orderId, actionType } = confirmModal;
     try {
       if (actionType === 'accept') {
+        // Concurrency check: Ensure no other motoboy accepted it first
+        const currentOrder = orders.find(o => o.id === orderId);
+        if (currentOrder?.motoboyId && currentOrder.motoboyId !== user.uid) {
+          alert('Este pedido já foi aceito por outro motoboy!');
+          setConfirmModal(null);
+          setIsUpdating(false);
+          return;
+        }
+
         if (!profile.online) {
           await updateProfile({ online: true, ultimaAtualizacao: new Date().toISOString() });
         }

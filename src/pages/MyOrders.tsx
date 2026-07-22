@@ -93,12 +93,23 @@ export default function MyOrders() {
     );
   }
 
-  // Filter orders for the logged in user
+  // Filter orders for the logged in user (only orders where the user is the customer who placed the order)
   const myOrders = orders.filter((order) => {
-    return (
-      order.usuario?.uid === user.uid || 
-      (profile?.phone && order.customerPhone === profile.phone)
-    );
+    if (!user) return false;
+
+    // 1. Primary check: order explicitly belongs to this user ID
+    if (order.usuario?.uid) {
+      return order.usuario.uid === user.uid;
+    }
+
+    // 2. Secondary fallback for guest orders without usuario.uid matching exact phone number
+    if (profile?.phone && profile.phone.trim().length > 5 && order.customerPhone) {
+      const cleanProfilePhone = profile.phone.replace(/\D/g, '');
+      const cleanCustomerPhone = order.customerPhone.replace(/\D/g, '');
+      return cleanProfilePhone.length > 5 && cleanProfilePhone === cleanCustomerPhone;
+    }
+
+    return false;
   });
 
   const activeOrders = myOrders.filter(order => order.status !== 'delivered' && order.status !== 'refused');
@@ -509,6 +520,27 @@ export default function MyOrders() {
               transition={{ duration: 0.15 }}
               className="flex flex-col gap-4"
             >
+              {profile?.role === 'motoboy' && (
+                <div className="bg-indigo-50 border border-indigo-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+                  <div className="flex items-center gap-2.5">
+                    <div className="bg-indigo-600 text-white p-2 rounded-xl shrink-0">
+                      <Bike className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-extrabold text-indigo-950">Você é Motoboy Parceiro 🏍️</p>
+                      <p className="text-[10px] text-indigo-700 leading-snug">
+                        Esta tela exibe apenas seus pedidos feitos como cliente. Para realizar entregas, acesse seu painel.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveView('motoboy')}
+                    className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-extrabold transition shadow-sm cursor-pointer"
+                  >
+                    Painel Motoboy
+                  </button>
+                </div>
+              )}
               {myOrders.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-8 text-center bg-white/45 backdrop-blur-md rounded-3xl border border-white/30 py-16">
                   <ShoppingBag className="h-10 w-10 text-gray-300 mb-3" />
