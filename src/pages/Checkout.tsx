@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Check, Clipboard, DollarSign, CreditCard, Landmark, CheckCircle, Clock, Truck, MapPin, User, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Check, Clipboard, DollarSign, CreditCard, Landmark, CheckCircle, Clock, Truck, MapPin, User, AlertCircle, ShieldCheck, Lock, Sparkles, ExternalLink } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { formatPrice } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Coupon } from '../types';
+import MercadoPagoCheckoutBrick from '../components/MercadoPagoCheckoutBrick';
 
 export default function Checkout() {
   const { cart, subtotal, deliveryFee, clearCart } = useCart();
@@ -29,12 +30,17 @@ export default function Checkout() {
   const [reference, setReference] = useState('');
   const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Mercado Pago vs Delivery payment options
+  const [paymentOption, setPaymentOption] = useState<'mercadopago' | 'delivery'>('mercadopago');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | 'cash'>('pix');
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  // Success states
+  // Success & Pending Mercado Pago States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [placedOrder, setPlacedOrder] = useState<any>(null);
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
+  const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
+  const [mpError, setMpError] = useState<string | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
 
   // Coupon state
@@ -182,9 +188,133 @@ export default function Checkout() {
     e.preventDefault();
     if (!validate()) return;
 
+    if (paymentOption === 'mercadopago') {
+      setIsSubmitting(true);
+      setMpError(null);
+      try {
+        const orderItems = cart.map((item) => ({
+          productId: item.productId,
+          productName: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        }));
+
+        const formattedAddress = tipoPedido === 'retirada'
+          ? 'Retirada no Restaurante'
+          : `${street}, nº ${number} - ${neighborhood}, ${city} - CEP: ${cep}`;
+
+        if (tipoPedido === 'entrega' && user) {
+          await updateUserAddress({
+            cep,
+            street,
+            number,
+            neighborhood,
+            city,
+            complement: complement || undefined,
+            reference: reference || undefined,
+          });
+        }
+
+        const newOrder = await createOrder({
+          customerName: name,
+          customerPhone: phone,
+          address: formattedAddress,
+          complement: complement || undefined,
+          paymentMethod: 'mercadopago',
+          paymentStatus: 'pending',
+          statusPagamento: 'pendente',
+          items: orderItems,
+          subtotal,
+          deliveryFee: finalDeliveryFee,
+          total: finalTotal,
+          
+          tipoPedido,
+          status: 'awaiting_payment',
+          valorProdutos: subtotal,
+          taxaEntrega: finalDeliveryFee,
+          valorTotal: finalTotal,
+          formaEntrega: tipoPedido === 'entrega' ? 'Entrega' : 'Retirada',
+          endereco: tipoPedido === 'entrega' ? {
+            cep,
+            street,
+            number,
+            neighborhood,
+            city,
+            complement: complement || undefined,
+            reference: reference || undefined,
+          } : 'Retirada',
+          usuario: user ? {
+            uid: user.uid,
+            name,
+            email: user.email || '',
+            phone,
+          } : undefined,
+          itens: orderItems,
+          horarioPedido: new Date().toISOString(),
+          cupom: appliedCoupon ? appliedCoupon.code : undefined,
+          desconto: discountAmount > 0 ? discountAmount : undefined,
+        });
+
+        if (appliedCoupon && settings) {
+          const updatedCoupons = settings.coupons?.map(c => {
+            if (c.id === appliedCoupon.id) {
+              return { ...c, usedCount: (c.usedCount || 0) + 1 };
+            }
+            return c;
+          });
+          if (updatedCoupons) {
+            try {
+              await updateSettings({
+                ...settings,
+                coupons: updatedCoupons
+              });
+            } catch (e) {
+              console.error('Erro ao atualizar contador de uso do cupom:', e);
+            }
+          }
+        }
+
+        setPendingOrder(newOrder);
+
+        // Fetch preference and automatically open Mercado Pago tab
+        try {
+          const prefRes = await fetch('/api/mercadopago/create-preference', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderData: {
+                id: newOrder.id,
+                customerName: name,
+                customerEmail: user?.email || 'cliente@maestriagrill.com',
+                customerPhone: phone,
+                total: finalTotal,
+                deliveryFee: finalDeliveryFee,
+                items: orderItems,
+              },
+            }),
+          });
+          const prefData = await prefRes.json();
+          if (prefData && (prefData.init_point || prefData.sandbox_init_point)) {
+            const redirectUrl = prefData.init_point || prefData.sandbox_init_point;
+            setMpInitPoint(redirectUrl);
+            // Open direct Mercado Pago checkout tab
+            window.open(redirectUrl, '_blank');
+          }
+        } catch (prefErr) {
+          console.error('Erro ao gerar preferência Mercado Pago:', prefErr);
+        }
+      } catch (err: any) {
+        console.error('Error creating order for Mercado Pago:', err);
+        setMpError('Ocorreu um erro ao preparar o pedido. Tente novamente.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // Direct submission for Cash or Card Machine on delivery
     setIsSubmitting(true);
     try {
-      // Structure the items
       const orderItems = cart.map((item) => ({
         productId: item.productId,
         productName: item.name,
@@ -192,12 +322,10 @@ export default function Checkout() {
         price: item.price,
       }));
 
-      // Address string formatted for backward compatibility or simple display
       const formattedAddress = tipoPedido === 'retirada'
         ? 'Retirada no Restaurante'
         : `${street}, nº ${number} - ${neighborhood}, ${city} - CEP: ${cep}`;
 
-      // Save address on user profile for future purchases if delivery and logged in
       if (tipoPedido === 'entrega' && user) {
         await updateUserAddress({
           cep,
@@ -210,19 +338,19 @@ export default function Checkout() {
         });
       }
 
-      // Create Order with all MVP required parameters
       const newOrder = await createOrder({
         customerName: name,
         customerPhone: phone,
         address: formattedAddress,
         complement: complement || undefined,
         paymentMethod,
+        paymentStatus: 'pending',
+        statusPagamento: 'pendente',
         items: orderItems,
         subtotal,
         deliveryFee: finalDeliveryFee,
         total: finalTotal,
         
-        // Expanded structure for Fase 1 MVP
         tipoPedido,
         status: 'pending',
         valorProdutos: subtotal,
@@ -250,7 +378,6 @@ export default function Checkout() {
         desconto: discountAmount > 0 ? discountAmount : undefined,
       });
 
-      // Increment coupon usage count if applied
       if (appliedCoupon && settings) {
         const updatedCoupons = settings.coupons?.map(c => {
           if (c.id === appliedCoupon.id) {
@@ -658,100 +785,182 @@ export default function Checkout() {
           )}
 
           {/* Payment selector card */}
-          <div className="rounded-3xl border border-white/35 bg-white/40 backdrop-blur-md p-5 shadow-sm">
-            <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-gray-400 mb-4">Forma de Pagamento</h3>
+          <div className="rounded-3xl border border-white/35 bg-white/40 backdrop-blur-md p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-gray-400">Forma de Pagamento</h3>
+              <span className="flex items-center gap-1 text-[10px] font-extrabold text-sky-700 bg-sky-50 border border-sky-200/80 px-2 py-0.5 rounded-full">
+                <ShieldCheck className="h-3 w-3 text-sky-600" /> Mercado Pago
+              </span>
+            </div>
             
-            <div className={`grid gap-2 ${
-              [isPixEnabled, isCardEnabled, isCashEnabled].filter(Boolean).length === 3 
-                ? 'grid-cols-3' 
-                : [isPixEnabled, isCardEnabled, isCashEnabled].filter(Boolean).length === 2 
-                  ? 'grid-cols-2' 
-                  : 'grid-cols-1'
-            }`}>
-              {isPixEnabled && (
-                <button
-                  type="button"
-                  id="payment-pix"
-                  onClick={() => setPaymentMethod('pix')}
-                  className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 transition ${
-                    paymentMethod === 'pix'
-                      ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/25'
-                      : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
-                  }`}
-                >
-                  <Landmark className="h-5 w-5" />
-                  <span className="text-[10px]">Pix Instantâneo</span>
-                </button>
-              )}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                id="payment-option-mp"
+                onClick={() => {
+                  setPaymentOption('mercadopago');
+                  setPendingOrder(null);
+                }}
+                className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3.5 transition text-center ${
+                  paymentOption === 'mercadopago'
+                    ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-extrabold border-orange-500/30'
+                    : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <ShieldCheck className="h-4 w-4 text-sky-600" />
+                  <span className="text-[11px] font-bold">Mercado Pago</span>
+                </div>
+                <span className="text-[9px] text-gray-500 leading-tight">
+                  Pix, Cartão Crédito/Débito, Saldo MP
+                </span>
+              </button>
 
-              {isCardEnabled && (
-                <button
-                  type="button"
-                  id="payment-card"
-                  onClick={() => setPaymentMethod('card')}
-                  className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 transition ${
-                    paymentMethod === 'card'
-                      ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/25'
-                      : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
-                  }`}
-                >
-                  <CreditCard className="h-5 w-5" />
-                  <span className="text-[10px]">Cartão (Maquininha)</span>
-                </button>
-              )}
-
-              {isCashEnabled && (
-                <button
-                  type="button"
-                  id="payment-cash"
-                  onClick={() => setPaymentMethod('cash')}
-                  className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3 transition ${
-                    paymentMethod === 'cash'
-                      ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/25'
-                      : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
-                  }`}
-                >
-                  <DollarSign className="h-5 w-5" />
-                  <span className="text-[10px]">Dinheiro</span>
-                </button>
-              )}
+              <button
+                type="button"
+                id="payment-option-delivery"
+                onClick={() => setPaymentOption('delivery')}
+                className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3.5 transition text-center ${
+                  paymentOption === 'delivery'
+                    ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/30'
+                    : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                  <span className="text-[11px] font-bold">Pagar na Entrega</span>
+                </div>
+                <span className="text-[9px] text-gray-500 leading-tight">
+                  Dinheiro ou Maquininha
+                </span>
+              </button>
             </div>
 
-            {/* Conditionally render Pix copy-paste instruction */}
-            {paymentMethod === 'pix' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="mt-4 rounded-2xl bg-white/40 border border-white/20 p-3.5 text-left text-xs"
-              >
-                <p className="font-semibold text-gray-800">Pagamento Pix Copia e Cola:</p>
-                <p className="mt-1 text-[10px] text-gray-500 line-clamp-2 bg-white/40 border border-white/20 rounded-lg p-2 font-mono truncate">
-                  00020126360014br.gov.bcb.pix0114gourmetbistromvp
-                </p>
-                <button
-                  type="button"
-                  id="btn-copy-pix"
-                  onClick={copyPixKey}
-                  className="mt-2.5 flex items-center justify-center gap-1 w-full rounded-xl bg-orange-600 py-2 text-[10px] font-bold text-white hover:bg-orange-700 transition"
-                >
-                  {pixCopied ? (
-                    <>
-                      <Check className="h-3 w-3" />
-                      Chave Copiada!
-                    </>
-                  ) : (
-                    <>
-                      <Clipboard className="h-3 w-3" />
-                      Copiar Código Pix
-                    </>
+            {/* Offline Delivery Payment Methods */}
+            {paymentOption === 'delivery' && (
+              <div className="pt-2 border-t border-white/20">
+                <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Selecione como deseja pagar no momento da entrega:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {isCardEnabled && (
+                    <button
+                      type="button"
+                      id="payment-card"
+                      onClick={() => setPaymentMethod('card')}
+                      className={`flex items-center justify-center gap-1.5 rounded-2xl border p-3 transition ${
+                        paymentMethod === 'card'
+                          ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/25'
+                          : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
+                      }`}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      <span className="text-[10px]">Cartão (Maquininha)</span>
+                    </button>
                   )}
-                </button>
-                <p className="mt-2 text-[9px] text-gray-400 text-center leading-normal">
-                  Pague com seu aplicativo de banco e finalize o pedido. Nós confirmaremos o recebimento do Pix em instantes!
-                </p>
-              </motion.div>
+
+                  {isCashEnabled && (
+                    <button
+                      type="button"
+                      id="payment-cash"
+                      onClick={() => setPaymentMethod('cash')}
+                      className={`flex items-center justify-center gap-1.5 rounded-2xl border p-3 transition ${
+                        paymentMethod === 'cash'
+                          ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/25'
+                          : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
+                      }`}
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      <span className="text-[10px]">Dinheiro</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
+
+          {/* Mercado Pago Error Alert */}
+          {mpError && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+              <span>{mpError}</span>
+            </div>
+          )}
+
+          {/* Mercado Pago Checkout Container */}
+          {paymentOption === 'mercadopago' && pendingOrder && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-3xl border border-sky-300/80 bg-white p-5 shadow-lg space-y-4"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div>
+                  <span className="text-[10px] font-extrabold text-sky-700 uppercase tracking-wider block">
+                    Pagamento do Pedido #{pendingOrder.id}
+                  </span>
+                  <h4 className="text-sm font-extrabold text-gray-900">
+                    Mercado Pago Checkout
+                  </h4>
+                </div>
+                <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1">
+                  {formatPrice(finalTotal)}
+                </span>
+              </div>
+
+              {/* Direct Tab Action Banner */}
+              {mpInitPoint && (
+                <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl space-y-2.5 text-center">
+                  <div className="flex items-center justify-center gap-2 text-sky-900 font-extrabold text-xs">
+                    <ExternalLink className="h-4 w-4 text-sky-600" />
+                    <span>Pagamento Direto no Mercado Pago</span>
+                  </div>
+                  <p className="text-[11px] text-sky-800 leading-relaxed font-medium">
+                    A aba oficial do Mercado Pago foi aberta. Caso não tenha aberto automaticamente no seu navegador, clique no botão abaixo para efetuar o pagamento com Pix, Cartão ou Saldo:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => window.open(mpInitPoint, '_blank')}
+                    className="w-full flex items-center justify-center gap-2 bg-sky-600 text-white text-xs font-extrabold py-3 px-4 rounded-xl shadow-md hover:bg-sky-700 active:scale-98 transition"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Abrir Checkout Direto no Mercado Pago
+                  </button>
+                </div>
+              )}
+
+              {/* Or Pay directly inside the embedded Brick */}
+              <div className="pt-2">
+                <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 text-center">
+                  Ou pague diretamente por aqui:
+                </p>
+                <MercadoPagoCheckoutBrick
+                  amount={finalTotal}
+                  orderId={pendingOrder.id}
+                  customerName={name}
+                  customerEmail={user?.email || 'cliente@maestriagrill.com'}
+                  customerPhone={phone}
+                  items={cart.map((item) => ({
+                    productId: item.productId,
+                    productName: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                  }))}
+                  deliveryFee={finalDeliveryFee}
+                  onSuccess={(result) => {
+                    setPlacedOrder({
+                      ...pendingOrder,
+                      paymentStatus: 'paid',
+                      statusPagamento: 'pago',
+                      status: 'pending',
+                    });
+                    clearCart();
+                  }}
+                  onError={(errMessage) => {
+                    setMpError(errMessage);
+                  }}
+                />
+              </div>
+            </motion.div>
+          )}
 
           {/* Cupom de Desconto */}
           <div className="rounded-3xl border border-white/35 bg-white/40 backdrop-blur-md p-5 shadow-sm">
@@ -809,21 +1018,37 @@ export default function Checkout() {
 
           {/* Order confirmation button */}
           <div className="mt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              id="btn-submit-order"
-              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-orange-600 py-4 text-xs font-bold text-white shadow-lg shadow-orange-500/25 hover:bg-orange-700 transition active:scale-98 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                  Processando pedido...
-                </>
-              ) : (
-                'Confirmar e Enviar Pedido'
-              )}
-            </button>
+            {paymentOption === 'mercadopago' && pendingOrder ? (
+              <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-center">
+                <span className="text-xs font-bold text-emerald-800 flex items-center justify-center gap-1.5">
+                  <CheckCircle className="h-4 w-4 text-emerald-600" /> Pedido #{pendingOrder.id} gerado!
+                </span>
+                <p className="text-[10px] text-gray-600 mt-1">
+                  Selecione seu método de pagamento no quadro do Mercado Pago acima para concluir.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                id="btn-submit-order"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-orange-600 py-4 text-xs font-bold text-white shadow-lg shadow-orange-500/25 hover:bg-orange-700 transition active:scale-98 disabled:opacity-50"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Processando pedido...
+                  </>
+                ) : paymentOption === 'mercadopago' ? (
+                  <>
+                    <ShieldCheck className="h-4 w-4 text-white" />
+                    Ir para Pagamento Mercado Pago
+                  </>
+                ) : (
+                  'Confirmar e Enviar Pedido'
+                )}
+              </button>
+            )}
           </div>
         </form>
       </div>

@@ -186,17 +186,9 @@ export default function MotoboyOrderNotification() {
                   <span className="font-bold text-gray-800 text-sm">{activeNotificationOrder.customerName}</span>
                 </div>
               </div>
-              {activeNotificationOrder.customerPhone && (
-                <a
-                  href={`https://wa.me/55${activeNotificationOrder.customerPhone.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl hover:bg-emerald-100 transition"
-                >
-                  <Phone className="h-3.5 w-3.5" />
-                  <span>Contato</span>
-                </a>
-              )}
+              <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">
+                🔒 Contato liberado após aceitar
+              </span>
             </div>
 
             {/* Address */}

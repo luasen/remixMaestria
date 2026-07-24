@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/firebase';
+import { handleFirestoreError, OperationType } from '../services/db';
 import { 
   collection, 
   query, 
@@ -96,6 +97,8 @@ export default function AdminChatDashboard() {
           }
         });
         setUnreadCounts((prev) => ({ ...prev, [order.id]: count }));
+      }, (error) => {
+        console.warn(`Error fetching unread count for order ${order.id}:`, error);
       });
     });
 
@@ -121,6 +124,8 @@ export default function AdminChatDashboard() {
         const data = snapshot.data();
         setIsOrderDelivered(data.status === 'delivered' || data.statusEntrega === 'entregue');
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `orders/${selectedOrder.id}`);
     });
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -149,6 +154,12 @@ export default function AdminChatDashboard() {
         }
       });
       setMessages(fetchedMessages);
+    }, (error) => {
+      try {
+        handleFirestoreError(error, OperationType.GET, `orders/${selectedOrder.id}/messages`);
+      } catch (e) {
+        // Formatted error
+      }
     });
 
     return () => {

@@ -22,7 +22,7 @@ export interface OrderItem {
   price: number;
 }
 
-export type OrderStatus = 'pending' | 'preparing' | 'ready' | 'delivered' | 'refused';
+export type OrderStatus = 'awaiting_payment' | 'pending' | 'preparing' | 'ready' | 'delivered' | 'refused';
 
 export interface Address {
   cep: string;
@@ -86,6 +86,14 @@ export interface Order {
   statusEntrega?: 'aceito' | 'retirado' | 'a_caminho' | 'entregue';
   horarioEntrega?: string;
   motivoRecusa?: string;
+
+  // Mercado Pago Payment Fields
+  paymentStatus?: 'pending' | 'paid' | 'refused' | 'cancelled';
+  statusPagamento?: 'pendente' | 'pago' | 'recusado' | 'cancelado';
+  mercadopagoPaymentId?: string;
+  mercadopagoStatus?: string;
+  mercadopagoPaymentMethod?: string;
+  paidAt?: string;
 }
 
 export interface Coupon {
@@ -157,6 +165,7 @@ export interface RestaurantSettings {
   // 8. Aparência
   primaryColor?: string;
   secondaryColor?: string;
+  backgroundColor?: string;
   homeImage?: string;
   splashImage?: string;
   appNameExhibited?: string;

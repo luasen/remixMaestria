@@ -144,6 +144,9 @@ export default function MyOrders() {
       }
       return { label: 'Pronto / Aguardando Motoboy', color: 'bg-blue-50 text-blue-700 border-blue-200', step: 3 };
     }
+    if (status === 'awaiting_payment') {
+      return { label: 'Aguardando Pagamento', color: 'bg-amber-50 text-amber-800 border-amber-200', step: 0.5 };
+    }
     if (status === 'preparing') {
       return { label: 'Em Preparação', color: 'bg-amber-50 text-amber-700 border-amber-200', step: 2 };
     }

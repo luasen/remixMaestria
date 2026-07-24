@@ -446,6 +446,11 @@ export default function Motoboy() {
                   badgeClass = 'bg-amber-100 text-amber-800';
                 }
 
+                const cleanPhone = order.customerPhone ? order.customerPhone.replace(/\D/g, '') : '';
+                const whatsappUrl = cleanPhone 
+                  ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(`Olá ${order.customerName}! Sou o motoboy responsável pela entrega do seu Pedido #${order.id}.`)}`
+                  : '#';
+
                 return (
                   <motion.div
                     key={order.id}
@@ -470,26 +475,46 @@ export default function Motoboy() {
 
                     {/* Customer & Address Details */}
                     <div className="flex flex-col gap-3.5 text-xs">
-                      <div className="flex items-center justify-between bg-gray-50/50 p-3 rounded-2xl border border-gray-100/50">
+                      <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50/80 p-3 rounded-2xl border border-gray-100">
                         <div>
                           <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">Cliente</span>
                           <span className="font-bold text-gray-800 text-sm mt-0.5 block">{order.customerName}</span>
+                          {cleanPhone && (
+                            <span className="text-[11px] font-semibold text-gray-500 block mt-0.5">
+                              📞 {order.customerPhone}
+                            </span>
+                          )}
                         </div>
-                        <div className="flex gap-2">
+
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <ChatButtonWithBadge
                             orderId={order.id}
                             onClick={() => setSelectedChatOrder(order)}
                             size="icon"
                             variant="outline"
                           />
-                          {order.customerPhone && (
-                            <a
-                              href={`tel:${order.customerPhone}`}
-                              className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm hover:bg-orange-700 transition"
-                              title="Ligar para Cliente"
-                            >
-                              <Phone className="h-4.5 w-4.5" />
-                            </a>
+
+                          {cleanPhone && (
+                            <>
+                              <a
+                                href={whatsappUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-emerald-600 text-white font-bold text-xs shadow-sm hover:bg-emerald-700 transition active:scale-95"
+                                title="Abrir WhatsApp com o Cliente"
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                <span>WhatsApp</span>
+                              </a>
+
+                              <a
+                                href={`tel:${cleanPhone}`}
+                                className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-200/80 text-gray-700 hover:bg-gray-300 transition"
+                                title="Ligar para o Cliente"
+                              >
+                                <Phone className="h-4 w-4" />
+                              </a>
+                            </>
                           )}
                         </div>
                       </div>

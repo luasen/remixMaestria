@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/firebase';
+import { handleFirestoreError, OperationType } from '../services/db';
 import { collection, query, onSnapshot, where } from 'firebase/firestore';
 import { MessageSquare } from 'lucide-react';
 
@@ -35,6 +36,11 @@ export default function ChatButtonWithBadge({ orderId, onClick, variant = 'outli
       setUnreadCount(count);
     }, (error) => {
       console.error("Error fetching unread messages count:", error);
+      try {
+        handleFirestoreError(error, OperationType.GET, `orders/${orderId}/messages`);
+      } catch (e) {
+        // Handled
+      }
     });
 
     return () => unsubscribe();

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../services/firebase';
+import { handleFirestoreError, OperationType } from '../services/db';
 import { 
   collection, 
   query, 
@@ -89,6 +90,8 @@ export default function OrderChatModal({ orderId, orderNumber, customerName, isO
           setMotoboyId(data.motoboyId);
         }
       }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, `orders/${orderId}`);
     });
 
     return () => unsubscribe();
@@ -104,6 +107,8 @@ export default function OrderChatModal({ orderId, orderNumber, customerName, isO
         const data = snapshot.data();
         setMotoboyOnline(data.online === true);
       }
+    }, (error) => {
+      console.warn("Could not fetch motoboy presence:", error);
     });
 
     return () => unsubscribe();
@@ -154,6 +159,11 @@ export default function OrderChatModal({ orderId, orderNumber, customerName, isO
       setMessages(fetchedMessages);
     }, (error) => {
       console.error("Error listening to chat messages:", error);
+      try {
+        handleFirestoreError(error, OperationType.GET, `orders/${orderId}/messages`);
+      } catch (e) {
+        // Error formatted and logged
+      }
     });
 
     return () => unsubscribe();
@@ -189,6 +199,8 @@ export default function OrderChatModal({ orderId, orderNumber, customerName, isO
       });
 
       setTypists(activeTypists);
+    }, (error) => {
+      console.warn("Error listening to typing status:", error);
     });
 
     return () => unsubscribe();

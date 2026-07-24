@@ -1,7 +1,8 @@
 import React from 'react';
-import { BookOpen, MapPin, Clock, ShieldCheck, Heart, Sparkles, ShoppingBag, History } from 'lucide-react';
+import { BookOpen, MapPin, Clock, ShieldCheck, Heart, Sparkles, ShoppingBag } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import PromoBanner from '../components/PromoBanner';
 import { motion } from 'motion/react';
 
 export default function Home() {
@@ -22,7 +23,7 @@ export default function Home() {
           className="h-full w-full object-cover opacity-80"
           referrerPolicy="no-referrer"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#FFF7F4] via-[#FFF7F4]/30 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--site-bg-color,#fff7f4)] via-[var(--site-bg-color,#fff7f4)]/30 to-transparent"></div>
         
         {/* Quick floating specs */}
         <div className="absolute top-4 right-4 flex gap-2">
@@ -114,11 +115,7 @@ export default function Home() {
         </div>
 
         {/* Dynamic promotional banner */}
-        <div className="mt-6 overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500/85 to-amber-500/85 backdrop-blur-md p-5 text-white border border-white/25 shadow-lg shadow-orange-500/5">
-          <span className="text-[10px] font-bold uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full">Oferta do Dia</span>
-          <h3 className="mt-1.5 text-lg font-bold">Ganhe taxa grátis hoje!</h3>
-          <p className="mt-0.5 text-xs text-orange-50 font-medium">Faça seu primeiro pedido e saboreie o melhor da nossa gastronomia de forma rápida e segura.</p>
-        </div>
+        <PromoBanner className="mt-6" />
 
         {/* Quick Admin Access Hint */}
         {(profile?.role === 'admin' || profile?.role === 'superadmin') && (

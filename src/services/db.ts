@@ -248,6 +248,7 @@ const DEFAULT_SETTINGS: RestaurantSettings = {
   // 8. Aparência
   primaryColor: '#ea580c', // orange-600
   secondaryColor: '#f97316', // orange-500
+  backgroundColor: '#fff7f4', // soft warm cream background
   homeImage: '',
   splashImage: '',
   appNameExhibited: 'Maestria Grill',
@@ -495,7 +496,14 @@ export const dbService = {
   async updateOrderStatus(id: string, status: Order['status']): Promise<Order> {
     try {
       const docRef = doc(db, 'orders', id);
-      await updateDoc(docRef, { status });
+      const updates: any = { status };
+      if (status === 'delivered') {
+        updates.paymentStatus = 'paid';
+        updates.statusPagamento = 'pago';
+        updates.statusEntrega = 'entregue';
+        updates.paidAt = new Date().toISOString();
+      }
+      await updateDoc(docRef, updates);
       const updatedSnap = await getDoc(docRef);
       return updatedSnap.data() as Order;
     } catch (error) {
@@ -507,7 +515,15 @@ export const dbService = {
   async updateOrder(id: string, updatedFields: Partial<Order>): Promise<Order> {
     try {
       const docRef = doc(db, 'orders', id);
-      await updateDoc(docRef, cleanUndefined(updatedFields));
+      const fields = { ...updatedFields };
+      if (fields.status === 'delivered' || fields.statusEntrega === 'entregue') {
+        fields.paymentStatus = 'paid';
+        fields.statusPagamento = 'pago';
+        if (!fields.paidAt) {
+          fields.paidAt = new Date().toISOString();
+        }
+      }
+      await updateDoc(docRef, cleanUndefined(fields));
       const updatedSnap = await getDoc(docRef);
       return updatedSnap.data() as Order;
     } catch (error) {

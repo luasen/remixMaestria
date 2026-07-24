@@ -43,6 +43,7 @@ import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Product, Category, RestaurantSettings, OrderStatus, Order, UserProfile } from '../types';
 import { formatPrice, formatDate } from '../utils';
+import { updateThemeColors } from '../utils/theme';
 import { motion, AnimatePresence } from 'motion/react';
 // @ts-ignore
 import restaurantBanner from '../assets/images/restaurant_banner_1783985102418.jpg';
@@ -119,10 +120,10 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    if (activeTab === 'employees' && (profile?.role === 'admin' || profile?.role === 'superadmin')) {
+    if (profile?.role === 'admin' || profile?.role === 'superadmin') {
       fetchUsers();
     }
-  }, [activeTab, profile]);
+  }, [profile]);
 
   const getDeliveryCount = (userId: string) => {
     return orders.filter(o => o.motoboyId === userId && o.status === 'delivered').length;
@@ -182,10 +183,79 @@ export default function Admin() {
   const [refusingOrderId, setRefusingOrderId] = useState<string | null>(null);
   const [refusalReason, setRefusalReason] = useState('');
 
-  const filteredOrders = orders.filter((order) => {
+  const activeOrders = orders.filter((order) => {
+    // Hide online Mercado Pago orders that are awaiting payment or unpaid
+    if (order.status === 'awaiting_payment') return false;
+    if (
+      order.paymentMethod === 'mercadopago' &&
+      order.paymentStatus !== 'paid' &&
+      order.statusPagamento !== 'pago'
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const filteredOrders = activeOrders.filter((order) => {
     if (selectedOrderStatusFilter === 'all') return true;
     return order.status === selectedOrderStatusFilter;
   });
+
+  const getOrderStatusText = (order: Order) => {
+    if (order.status === 'pending') return 'Recebido';
+    if (order.status === 'preparing') return 'Em Preparo';
+    if (order.status === 'refused') return 'Recusado';
+    if (order.status === 'delivered') return 'Entregue / Concluído';
+
+    if (order.status === 'ready') {
+      if (order.tipoPedido === 'retirada') {
+        return 'Pronto p/ Retirada no Balcão';
+      }
+      if (order.statusEntrega === 'aceito') {
+        return 'Motoboy Aceitou (A caminho da loja)';
+      }
+      if (order.statusEntrega === 'retirado') {
+        return 'Retirado p/ Motoboy (Em entrega)';
+      }
+      if (order.statusEntrega === 'a_caminho') {
+        return 'Motoboy em Trânsito ao Cliente';
+      }
+      if (order.statusEntrega === 'entregue') {
+        return 'Entregue pelo Motoboy';
+      }
+      return 'Pronto (Aguardando Motoboy)';
+    }
+
+    return 'Desconhecido';
+  };
+
+  const getOrderStatusBadgeStyle = (order: Order) => {
+    if (order.status === 'pending') return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (order.status === 'preparing') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (order.status === 'refused') return 'bg-rose-50 text-rose-700 border-rose-200';
+    if (order.status === 'delivered') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+    if (order.status === 'ready') {
+      if (order.tipoPedido === 'retirada') {
+        return 'bg-purple-50 text-purple-700 border-purple-200';
+      }
+      if (order.statusEntrega === 'aceito') {
+        return 'bg-sky-50 text-sky-800 border-sky-300';
+      }
+      if (order.statusEntrega === 'retirado') {
+        return 'bg-indigo-50 text-indigo-800 border-indigo-300';
+      }
+      if (order.statusEntrega === 'a_caminho') {
+        return 'bg-amber-50 text-amber-800 border-amber-300';
+      }
+      if (order.statusEntrega === 'entregue') {
+        return 'bg-emerald-50 text-emerald-800 border-emerald-300';
+      }
+      return 'bg-purple-50 text-purple-700 border-purple-200';
+    }
+
+    return 'bg-gray-50 text-gray-700 border-gray-200';
+  };
 
   const getStatusBadgeStyles = (status: OrderStatus) => {
     switch (status) {
@@ -208,7 +278,7 @@ export default function Admin() {
     switch (status) {
       case 'pending': return 'Recebido';
       case 'preparing': return 'Em Preparo';
-      case 'ready': return 'Pronto (Retirada/Entrega)';
+      case 'ready': return 'Pronto / Em Entrega';
       case 'delivered': return 'Entregue';
       case 'refused': return 'Recusado';
     }
@@ -359,10 +429,19 @@ export default function Admin() {
 
   const updateSysField = (field: keyof RestaurantSettings, value: any) => {
     if (!sysSettings) return;
-    setSysSettings({
+    const updated = {
       ...sysSettings,
       [field]: value
-    });
+    };
+    setSysSettings(updated);
+
+    if (field === 'primaryColor' || field === 'secondaryColor' || field === 'backgroundColor') {
+      updateThemeColors(
+        field === 'primaryColor' ? value : updated.primaryColor,
+        field === 'secondaryColor' ? value : updated.secondaryColor,
+        field === 'backgroundColor' ? value : updated.backgroundColor
+      );
+    }
   };
 
   // --- COUPON ACTIONS ---
@@ -553,7 +632,7 @@ export default function Admin() {
             }`}
           >
             <ListOrdered className="h-4.5 w-4.5 mb-1" />
-            Pedidos ({orders.length})
+            Pedidos ({activeOrders.length})
           </button>
 
           <button
@@ -689,8 +768,8 @@ export default function Admin() {
                           <span className="text-[10px] font-bold text-gray-400">PEDIDO</span>
                           <h4 className="font-sans text-sm font-extrabold text-gray-900">{order.id}</h4>
                         </div>
-                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getStatusBadgeStyles(order.status)}`}>
-                          {getStatusLabel(order.status)}
+                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getOrderStatusBadgeStyle(order)}`}>
+                          {getOrderStatusText(order)}
                         </span>
                       </div>
 
@@ -761,6 +840,15 @@ export default function Admin() {
                         <div>
                           <span className="text-[10px] text-gray-400 font-medium uppercase">Forma de pag.:</span>
                           <span className="ml-1 text-[10px] font-extrabold text-gray-800 uppercase">{order.paymentMethod}</span>
+                          {(order.paymentStatus === 'paid' || order.statusPagamento === 'pago') ? (
+                            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-extrabold text-emerald-700 border border-emerald-500/20">
+                              🟢 PAGO (Mercado Pago)
+                            </span>
+                          ) : (
+                            <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[9px] font-bold text-amber-700 border border-amber-500/20">
+                              🟡 PENDENTE
+                            </span>
+                          )}
                         </div>
                         <div className="text-right">
                           <span className="text-[10px] text-gray-400 font-medium uppercase block">Total:</span>
@@ -826,44 +914,225 @@ export default function Admin() {
                           </div>
                         )}
                         {order.status === 'preparing' && (
-                          <button
-                            onClick={() => {
-                              setConfirmStatusModal({
-                                isOpen: true,
-                                orderId: order.id,
-                                targetStatus: 'ready',
-                                title: 'Marcar Pedido como Pronto',
-                                message: `Deseja alterar o status do Pedido #${order.id} para "Pronto"? O pedido ficará disponível para os motoboys para entrega.`,
-                                confirmLabel: 'Marcar como Pronto',
-                                variant: 'blue'
-                              });
-                            }}
-                            id={`btn-status-ready-${order.id}`}
-                            className="flex-1 flex items-center justify-center gap-1 bg-blue-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-blue-700 transition"
-                          >
-                            <Check className="h-4 w-4" />
-                            Marcar como Pronto
-                          </button>
+                          <div className="flex-1 flex gap-2 w-full">
+                            <button
+                              onClick={() => {
+                                setConfirmStatusModal({
+                                  isOpen: true,
+                                  orderId: order.id,
+                                  targetStatus: 'ready',
+                                  title: 'Marcar Pedido como Pronto',
+                                  message: `Deseja alterar o status do Pedido #${order.id} para "Pronto"? O pedido ficará disponível para os motoboys para entrega.`,
+                                  confirmLabel: 'Marcar como Pronto',
+                                  variant: 'blue'
+                                });
+                              }}
+                              id={`btn-status-ready-${order.id}`}
+                              className="flex-1 flex items-center justify-center gap-1 bg-blue-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-blue-700 transition"
+                            >
+                              <Check className="h-4 w-4" />
+                              Marcar como Pronto
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRefusingOrderId(order.id);
+                                setRefusalReason('');
+                              }}
+                              id={`btn-status-cancel-${order.id}`}
+                              className="flex items-center justify-center gap-1 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl py-2.5 px-3.5 text-xs font-bold hover:bg-rose-100 transition"
+                            >
+                              <X className="h-4 w-4" />
+                              Cancelar Pedido
+                            </button>
+                          </div>
                         )}
-                        {order.status === 'ready' && (
-                          <button
-                            onClick={() => {
-                              setConfirmStatusModal({
-                                isOpen: true,
-                                orderId: order.id,
-                                targetStatus: 'delivered',
-                                title: 'Finalizar Pedido',
-                                message: `Deseja finalizar e marcar o Pedido #${order.id} como "Entregue"?`,
-                                confirmLabel: 'Marcar como Entregue',
-                                variant: 'emerald'
-                              });
-                            }}
-                            id={`btn-status-delivered-${order.id}`}
-                            className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-emerald-700 transition"
-                          >
-                            <Truck className="h-4 w-4" />
-                            Marcar como Entregue
-                          </button>
+                        {order.status === 'ready' && order.tipoPedido === 'entrega' && (
+                          <div className="flex flex-col gap-3.5 w-full">
+                            {/* Motoboy Header Info */}
+                            <div className="flex items-center justify-between p-3 rounded-2xl bg-orange-500/10 border border-orange-500/20">
+                              <div className="flex items-center gap-2.5">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-600 text-white font-bold text-sm shadow-sm">
+                                  🏍️
+                                </div>
+                                <div>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Motoboy Responsável</span>
+                                  <p className="text-xs font-extrabold text-gray-900">
+                                    {order.motoboyId
+                                      ? (usersList.find(u => u.uid === order.motoboyId)?.name || 'Motoboy Atribuído')
+                                      : 'Nenhum motoboy aceitou ainda'}
+                                  </p>
+                                  {order.motoboyId && usersList.find(u => u.uid === order.motoboyId)?.phone && (
+                                    <p className="text-[10px] text-gray-500 font-medium">
+                                      {usersList.find(u => u.uid === order.motoboyId)?.phone}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {order.motoboyId && (
+                                <ChatButtonWithBadge
+                                  orderId={order.id}
+                                  onClick={() => setSelectedChatOrder(order)}
+                                  size="icon"
+                                  variant="outline"
+                                />
+                              )}
+                            </div>
+
+                            {/* Motoboy Delivery Timeline / Status Tracker */}
+                            <div className="p-3.5 rounded-2xl bg-white/50 border border-white/30 backdrop-blur-sm">
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1">
+                                <Truck className="h-3.5 w-3.5 text-orange-600" />
+                                Acompanhamento de Entrega em Tempo Real
+                              </div>
+
+                              <div className="grid grid-cols-4 gap-1 relative my-2">
+                                {/* Step 1: Aceito */}
+                                <div className={`flex flex-col items-center text-center gap-1 ${
+                                  order.statusEntrega === 'aceito' || order.statusEntrega === 'retirado' || order.statusEntrega === 'a_caminho' || order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                    ? 'text-sky-700 font-bold'
+                                    : 'text-gray-300 font-medium'
+                                }`}>
+                                  <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] ${
+                                    order.statusEntrega === 'aceito' || order.statusEntrega === 'retirado' || order.statusEntrega === 'a_caminho' || order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                      ? 'bg-sky-600 text-white font-black shadow-sm'
+                                      : 'bg-gray-200 text-gray-400'
+                                  }`}>
+                                    1
+                                  </div>
+                                  <span className="text-[9px] leading-tight">Aceito</span>
+                                </div>
+
+                                {/* Step 2: Retirado */}
+                                <div className={`flex flex-col items-center text-center gap-1 ${
+                                  order.statusEntrega === 'retirado' || order.statusEntrega === 'a_caminho' || order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                    ? 'text-indigo-700 font-bold'
+                                    : 'text-gray-300 font-medium'
+                                }`}>
+                                  <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] ${
+                                    order.statusEntrega === 'retirado' || order.statusEntrega === 'a_caminho' || order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                      ? 'bg-indigo-600 text-white font-black shadow-sm'
+                                      : 'bg-gray-200 text-gray-400'
+                                  }`}>
+                                    2
+                                  </div>
+                                  <span className="text-[9px] leading-tight">Retirado</span>
+                                </div>
+
+                                {/* Step 3: Em Trânsito */}
+                                <div className={`flex flex-col items-center text-center gap-1 ${
+                                  order.statusEntrega === 'a_caminho' || order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                    ? 'text-amber-700 font-bold'
+                                    : 'text-gray-300 font-medium'
+                                }`}>
+                                  <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] ${
+                                    order.statusEntrega === 'a_caminho' || order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                      ? 'bg-amber-600 text-white font-black shadow-sm'
+                                      : 'bg-gray-200 text-gray-400'
+                                  }`}>
+                                    3
+                                  </div>
+                                  <span className="text-[9px] leading-tight">A Caminho</span>
+                                </div>
+
+                                {/* Step 4: Entregue */}
+                                <div className={`flex flex-col items-center text-center gap-1 ${
+                                  order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                    ? 'text-emerald-700 font-bold'
+                                    : 'text-gray-300 font-medium'
+                                }`}>
+                                  <div className={`h-6 w-6 rounded-full flex items-center justify-center text-[10px] ${
+                                    order.statusEntrega === 'entregue' || order.status === 'delivered'
+                                      ? 'bg-emerald-600 text-white font-black shadow-sm'
+                                      : 'bg-gray-200 text-gray-400'
+                                  }`}>
+                                    4
+                                  </div>
+                                  <span className="text-[9px] leading-tight">Entregue</span>
+                                </div>
+                              </div>
+
+                              {/* Detail description box */}
+                              <div className="mt-2.5 p-2.5 rounded-xl bg-orange-50/80 border border-orange-100 text-[11px] text-orange-950 flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-orange-600 shrink-0" />
+                                <div>
+                                  {!order.motoboyId && 'Aguardando algum motoboy aceitar a corrida no aplicativo.'}
+                                  {order.motoboyId && order.statusEntrega === 'aceito' && 'Motoboy aceitou a corrida e está a caminho do restaurante para retirar o pedido.'}
+                                  {order.motoboyId && order.statusEntrega === 'retirado' && 'Motoboy retirou o pedido na cozinha e está organizando a bag.'}
+                                  {order.motoboyId && order.statusEntrega === 'a_caminho' && 'Motoboy está em trânsito indo ao endereço do cliente.'}
+                                  {order.motoboyId && order.statusEntrega === 'entregue' && 'Entrega realizada com sucesso pelo motoboy.'}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Manual Override Action Buttons (Finalize or Cancel) */}
+                            <div className="flex gap-2 w-full">
+                              <button
+                                onClick={() => {
+                                  setConfirmStatusModal({
+                                    isOpen: true,
+                                    orderId: order.id,
+                                    targetStatus: 'delivered',
+                                    title: 'Finalizar Pedido Manualmente',
+                                    message: `Deseja finalizar manualmente o Pedido #${order.id} e alterar o status para "Entregue"?`,
+                                    confirmLabel: 'Finalizar Pedido',
+                                    variant: 'emerald'
+                                  });
+                                }}
+                                id={`btn-status-delivered-${order.id}`}
+                                className="flex-1 flex items-center justify-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300/70 rounded-xl py-2 px-3 text-xs font-bold transition"
+                              >
+                                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                Finalizar Entrega Manualmente
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setRefusingOrderId(order.id);
+                                  setRefusalReason('');
+                                }}
+                                id={`btn-status-cancel-delivery-${order.id}`}
+                                className="flex items-center justify-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl py-2 px-3 text-xs font-bold transition"
+                              >
+                                <X className="h-4 w-4 text-rose-600 shrink-0" />
+                                Cancelar Entrega / Pedido
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {order.status === 'ready' && order.tipoPedido === 'retirada' && (
+                          <div className="flex-1 flex gap-2 w-full">
+                            <button
+                              onClick={() => {
+                                setConfirmStatusModal({
+                                  isOpen: true,
+                                  orderId: order.id,
+                                  targetStatus: 'delivered',
+                                  title: 'Finalizar Retirada no Balcão',
+                                  message: `O cliente retirou o Pedido #${order.id}? Clique para marcar como concluído.`,
+                                  confirmLabel: 'Marcar como Retirado',
+                                  variant: 'emerald'
+                                });
+                              }}
+                              id={`btn-status-delivered-${order.id}`}
+                              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 text-white rounded-xl py-2.5 text-xs font-bold hover:bg-emerald-700 transition"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                              Marcar como Retirado pelo Cliente
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRefusingOrderId(order.id);
+                                setRefusalReason('');
+                              }}
+                              id={`btn-status-cancel-pickup-${order.id}`}
+                              className="flex items-center justify-center gap-1 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl py-2.5 px-3.5 text-xs font-bold hover:bg-rose-100 transition"
+                            >
+                              <X className="h-4 w-4" />
+                              Cancelar Pedido
+                            </button>
+                          </div>
                         )}
                         {order.status === 'delivered' && (
                           <div className="flex-1 flex items-center justify-center gap-1 bg-white/20 border border-white/20 text-gray-500 rounded-xl py-2.5 text-xs font-bold">
@@ -2485,26 +2754,93 @@ export default function Admin() {
 
                     {expandedSection === 'appearance' && (
                       <div className="p-4 border-t border-white/10 bg-white/10 flex flex-col gap-3.5">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor Primária (Hex)</label>
-                            <input
-                              type="text"
-                              value={sysSettings.primaryColor || '#ea580c'}
-                              onChange={(e) => updateSysField('primaryColor', e.target.value)}
-                              placeholder="#ea580c"
-                              className="w-full rounded-xl border border-white/30 bg-white/45 py-2 px-3 text-xs text-gray-800 outline-none focus:border-orange-500 font-mono"
-                            />
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor Primária</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={sysSettings.primaryColor || '#ea580c'}
+                                onChange={(e) => updateSysField('primaryColor', e.target.value)}
+                                className="h-9 w-9 rounded-xl border border-white/30 cursor-pointer bg-transparent p-0 overflow-hidden shrink-0"
+                              />
+                              <input
+                                type="text"
+                                value={sysSettings.primaryColor || '#ea580c'}
+                                onChange={(e) => updateSysField('primaryColor', e.target.value)}
+                                placeholder="#ea580c"
+                                className="w-full rounded-xl border border-white/30 bg-white/45 py-2 px-3 text-xs text-gray-800 outline-none focus:border-orange-500 font-mono"
+                              />
+                            </div>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor Secundária (Hex)</label>
-                            <input
-                              type="text"
-                              value={sysSettings.secondaryColor || '#fb923c'}
-                              onChange={(e) => updateSysField('secondaryColor', e.target.value)}
-                              placeholder="#fb923c"
-                              className="w-full rounded-xl border border-white/30 bg-white/45 py-2 px-3 text-xs text-gray-800 outline-none focus:border-orange-500 font-mono"
-                            />
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor Secundária</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={sysSettings.secondaryColor || '#fb923c'}
+                                onChange={(e) => updateSysField('secondaryColor', e.target.value)}
+                                className="h-9 w-9 rounded-xl border border-white/30 cursor-pointer bg-transparent p-0 overflow-hidden shrink-0"
+                              />
+                              <input
+                                type="text"
+                                value={sysSettings.secondaryColor || '#fb923c'}
+                                onChange={(e) => updateSysField('secondaryColor', e.target.value)}
+                                placeholder="#fb923c"
+                                className="w-full rounded-xl border border-white/30 bg-white/45 py-2 px-3 text-xs text-gray-800 outline-none focus:border-orange-500 font-mono"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Cor de Fundo do Site</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={sysSettings.backgroundColor || '#fff7f4'}
+                                onChange={(e) => updateSysField('backgroundColor', e.target.value)}
+                                className="h-9 w-9 rounded-xl border border-white/30 cursor-pointer bg-transparent p-0 overflow-hidden shrink-0"
+                              />
+                              <input
+                                type="text"
+                                value={sysSettings.backgroundColor || '#fff7f4'}
+                                onChange={(e) => updateSysField('backgroundColor', e.target.value)}
+                                placeholder="#fff7f4"
+                                className="w-full rounded-xl border border-white/30 bg-white/45 py-2 px-3 text-xs text-gray-800 outline-none focus:border-orange-500 font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Background Color Quick Presets */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Atalhos de Fundo Rápido</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {[
+                              { label: 'Creme Soft', color: '#fff7f4' },
+                              { label: 'Cinza Suave', color: '#f8fafc' },
+                              { label: 'Branco', color: '#ffffff' },
+                              { label: 'Azul Slate', color: '#f1f5f9' },
+                              { label: 'Laranja Leve', color: '#fff3ed' },
+                              { label: 'Escuro Slate', color: '#0f172a' },
+                              { label: 'Grafite Dark', color: '#18181b' },
+                            ].map((preset) => (
+                              <button
+                                key={preset.color}
+                                type="button"
+                                onClick={() => updateSysField('backgroundColor', preset.color)}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                  (sysSettings.backgroundColor || '#fff7f4').toLowerCase() === preset.color.toLowerCase()
+                                    ? 'border-orange-500 bg-orange-50 text-orange-950 shadow-sm'
+                                    : 'border-white/30 bg-white/40 text-gray-700 hover:bg-white/60'
+                                }`}
+                              >
+                                <span 
+                                  className="w-3 h-3 rounded-full border border-gray-300 shrink-0" 
+                                  style={{ backgroundColor: preset.color }} 
+                                />
+                                {preset.label}
+                              </button>
+                            ))}
                           </div>
                         </div>
 
@@ -2729,15 +3065,15 @@ export default function Admin() {
                   <X className="h-5 w-5" />
                 </span>
                 <h3 className="font-sans text-base font-extrabold text-gray-900">
-                  Recusar Pedido {refusingOrderId}
+                  Recusar ou Cancelar Pedido #{refusingOrderId}
                 </h3>
               </div>
               <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                Por favor, informe ao cliente o motivo da recusa deste pedido. Esta informação ficará visível no acompanhamento do cliente.
+                Por favor, informe o motivo do cancelamento ou recusa deste pedido. Esta informação ficará registrada e visível no acompanhamento do cliente.
               </p>
               
               <div className="mb-5">
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Motivo da Recusa</label>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Motivo do Cancelamento / Recusa</label>
                 <textarea
                   required
                   rows={3}

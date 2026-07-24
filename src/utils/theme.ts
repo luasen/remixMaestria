@@ -34,14 +34,24 @@ function mixRgb(c1: RGB, c2: RGB, weight: number): RGB {
   };
 }
 
-export function updateThemeColors(primaryHex: string | undefined, secondaryHex: string | undefined) {
+export function updateThemeColors(
+  primaryHex: string | undefined, 
+  secondaryHex: string | undefined,
+  bgHex?: string | undefined
+) {
   const defaultPrimary = '#ea580c'; // default orange-600
   const defaultSecondary = '#f97316'; // default orange-500
+  const defaultBg = '#fff7f4'; // default soft warm cream background
 
   const primary = primaryHex && primaryHex.trim() !== '' ? primaryHex : defaultPrimary;
   const secondary = secondaryHex && secondaryHex.trim() !== '' ? secondaryHex : defaultSecondary;
+  const bg = bgHex && bgHex.trim() !== '' ? bgHex : defaultBg;
 
   try {
+    const root = document.documentElement;
+    root.style.setProperty('--site-bg-color', bg);
+    document.body.style.backgroundColor = bg;
+
     const primaryRgb = hexToRgb(primary);
     const secondaryRgb = hexToRgb(secondary);
 

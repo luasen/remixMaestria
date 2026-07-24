@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Category, Product, Order, RestaurantSettings, UserProfile } from '../types';
-import { dbService } from '../services/db';
+import { dbService, handleFirestoreError, OperationType } from '../services/db';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { useAuth } from './AuthContext';
@@ -68,7 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    updateThemeColors(settings?.primaryColor, settings?.secondaryColor);
+    updateThemeColors(settings?.primaryColor, settings?.secondaryColor, settings?.backgroundColor);
   }, [settings]);
 
   useEffect(() => {
@@ -98,6 +98,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setOrders(sorted);
     }, (error) => {
       console.error('Error in orders snapshot listener:', error);
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'orders');
+      } catch (err) {
+        // Fallback to client-specific query if global listener was blocked
+        if (role === 'admin' || role === 'superadmin' || role === 'motoboy') {
+          const fallbackQ = query(collection(db, 'orders'), where('usuario.uid', '==', user.uid));
+          onSnapshot(fallbackQ, (subSnap) => {
+            const fetched: Order[] = [];
+            subSnap.forEach(d => fetched.push(d.data() as Order));
+            setOrders(fetched.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+          }, () => {});
+        }
+      }
     });
 
     return () => unsubscribe();

@@ -23,7 +23,10 @@ function AppContent() {
   // Maintenance mode check: active settings with maintenanceMode enabled, and user is not an admin/superadmin
   if (settings?.maintenanceMode && profile?.role !== 'admin' && profile?.role !== 'superadmin') {
     return (
-      <div className="relative mx-auto min-h-screen w-full max-w-lg bg-[#FFF7F4] border-x border-white/30 shadow-2xl flex flex-col items-center justify-center p-6 text-center">
+      <div 
+        className="relative mx-auto min-h-screen w-full max-w-lg border-x border-white/30 shadow-2xl flex flex-col items-center justify-center p-6 text-center transition-colors duration-300"
+        style={{ backgroundColor: 'var(--site-bg-color, #fff7f4)' }}
+      >
         {/* Background blurred orbs */}
         <div className="absolute top-[10%] left-[5%] w-[250px] h-[250px] bg-orange-200 rounded-full blur-[80px] opacity-40 pointer-events-none"></div>
         <div className="absolute bottom-[10%] right-[5%] w-[250px] h-[250px] bg-rose-200 rounded-full blur-[80px] opacity-35 pointer-events-none"></div>
@@ -154,7 +157,10 @@ export default function App() {
     <AuthProvider>
       <AppProvider>
         <CartProvider>
-          <div className="min-h-screen w-full bg-[#FFF7F4] relative overflow-hidden flex items-center justify-center">
+          <div 
+            className="min-h-screen w-full relative overflow-hidden flex items-center justify-center transition-colors duration-300"
+            style={{ backgroundColor: 'var(--site-bg-color, #fff7f4)' }}
+          >
             {/* Background blurred orbs */}
             <div className="fixed top-[-10%] left-[-5%] w-[400px] h-[400px] bg-orange-200 rounded-full blur-[100px] opacity-40 pointer-events-none"></div>
             <div className="fixed bottom-[-10%] right-[10%] w-[500px] h-[500px] bg-rose-200 rounded-full blur-[120px] opacity-35 pointer-events-none"></div>

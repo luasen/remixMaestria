@@ -3,6 +3,7 @@ import { Search, BookOpen, ShoppingBag } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useCart } from '../contexts/CartContext';
 import ProductCard from '../components/ProductCard';
+import PromoBanner from '../components/PromoBanner';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function Menu() {
@@ -76,6 +77,8 @@ export default function Menu() {
 
       {/* Products Grid list */}
       <div className="mx-auto max-w-lg px-4 py-5">
+        <PromoBanner className="mb-4" />
+
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-500 border-t-transparent"></div>
