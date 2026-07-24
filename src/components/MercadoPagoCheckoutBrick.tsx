@@ -66,9 +66,18 @@ export default function MercadoPagoCheckoutBrick({
           }),
         });
 
-        const data = await res.json();
+        const contentType = res.headers.get('content-type') || '';
+        let data: any = {};
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          console.error('[Mercado Pago Preference Error - Non JSON]:', text);
+          throw new Error('Servidor indisponível ou resposta inválida ao gerar preferência.');
+        }
+
         if (!res.ok || !data.id) {
-          throw new Error(data.error || 'Falha ao gerar a preferência de pagamento do Mercado Pago.');
+          throw new Error(data.details || data.error || 'Falha ao gerar a preferência de pagamento do Mercado Pago.');
         }
 
         if (isMounted) {
@@ -113,7 +122,13 @@ export default function MercadoPagoCheckoutBrick({
           },
         }),
       })
-        .then((res) => res.json())
+        .then(async (res) => {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            return res.json();
+          }
+          throw new Error('Servidor indisponível ou resposta inválida.');
+        })
         .then((result) => {
           if (result.success && result.id) {
             const newPaymentId = String(result.id);

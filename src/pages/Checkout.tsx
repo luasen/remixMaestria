@@ -293,12 +293,20 @@ export default function Checkout() {
               },
             }),
           });
-          const prefData = await prefRes.json();
-          if (prefData && (prefData.init_point || prefData.sandbox_init_point)) {
-            const redirectUrl = prefData.init_point || prefData.sandbox_init_point;
-            setMpInitPoint(redirectUrl);
-            // Open direct Mercado Pago checkout tab
-            window.open(redirectUrl, '_blank');
+
+          const contentType = prefRes.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const prefData = await prefRes.json();
+            if (prefRes.ok && prefData && (prefData.init_point || prefData.sandbox_init_point)) {
+              const redirectUrl = prefData.init_point || prefData.sandbox_init_point;
+              setMpInitPoint(redirectUrl);
+              // Open direct Mercado Pago checkout tab
+              window.open(redirectUrl, '_blank');
+            } else if (prefData.error) {
+              setMpError(prefData.details || prefData.error);
+            }
+          } else {
+            console.error('Resposta não-JSON ao criar preferência do Mercado Pago.');
           }
         } catch (prefErr) {
           console.error('Erro ao gerar preferência Mercado Pago:', prefErr);
