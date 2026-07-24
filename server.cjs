@@ -76,9 +76,11 @@ async function startServer() {
           error: "Dados do pagamento e do pedido s\xE3o obrigat\xF3rios."
         });
       }
-      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+      const rawAppUrl = process.env.APP_URL;
+      const isPlaceholderAppUrl = !rawAppUrl || rawAppUrl === "MY_APP_URL";
+      const host = req.headers["x-forwarded-host"] || req.get("host") || "sheikcoin.site";
       const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-      const appBaseUrl = process.env.APP_URL || `${protocol}://${host}`;
+      const appBaseUrl = (!isPlaceholderAppUrl ? rawAppUrl : `${protocol}://${host}`).replace(/\/$/, "");
       const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
       const amount = Number(formData.transaction_amount || orderData.total);
       const email = formData.payer?.email || orderData.customerEmail || "cliente@maestriagrill.com";
@@ -159,9 +161,11 @@ async function startServer() {
       if (!orderData) {
         return res.status(400).json({ error: "Dados do pedido s\xE3o obrigat\xF3rios." });
       }
-      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
+      const rawAppUrl = process.env.APP_URL;
+      const isPlaceholderAppUrl = !rawAppUrl || rawAppUrl === "MY_APP_URL";
+      const host = req.headers["x-forwarded-host"] || req.get("host") || "sheikcoin.site";
       const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
-      const appBaseUrl = process.env.APP_URL || `${protocol}://${host}`;
+      const appBaseUrl = (!isPlaceholderAppUrl ? rawAppUrl : `${protocol}://${host}`).replace(/\/$/, "");
       const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
       let items = (orderData.items || []).map((item) => ({
         id: String(item.productId || item.id || "item"),
