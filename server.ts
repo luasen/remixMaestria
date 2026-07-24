@@ -30,13 +30,20 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // CORS Middleware for Hostinger and external cross-origin requests
+  // CORS Middleware for Hostinger and external cross-origin requests (e.g. maestriagrill.site)
   app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-api-key');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      return res.sendStatus(204);
     }
     next();
   });
@@ -73,7 +80,7 @@ async function startServer() {
 
       const rawAppUrl = process.env.APP_URL;
       const isPlaceholderAppUrl = !rawAppUrl || rawAppUrl === 'MY_APP_URL';
-      const host = req.headers['x-forwarded-host'] || req.get('host') || 'sheikcoin.site';
+      const host = req.headers['x-forwarded-host'] || req.get('host') || 'maestriagrill.site';
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       const appBaseUrl = (!isPlaceholderAppUrl ? rawAppUrl : `${protocol}://${host}`).replace(/\/$/, '');
       const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
@@ -179,7 +186,7 @@ async function startServer() {
 
       const rawAppUrl = process.env.APP_URL;
       const isPlaceholderAppUrl = !rawAppUrl || rawAppUrl === 'MY_APP_URL';
-      const host = req.headers['x-forwarded-host'] || req.get('host') || 'sheikcoin.site';
+      const host = req.headers['x-forwarded-host'] || req.get('host') || 'maestriagrill.site';
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       const appBaseUrl = (!isPlaceholderAppUrl ? rawAppUrl : `${protocol}://${host}`).replace(/\/$/, '');
       const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
@@ -263,7 +270,7 @@ async function startServer() {
 
       const rawAppUrl = process.env.APP_URL;
       const isPlaceholderAppUrl = !rawAppUrl || rawAppUrl === 'MY_APP_URL';
-      const host = req.headers['x-forwarded-host'] || req.get('host') || 'sheikcoin.site';
+      const host = req.headers['x-forwarded-host'] || req.get('host') || 'maestriagrill.site';
       const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
       const appBaseUrl = (!isPlaceholderAppUrl ? rawAppUrl : `${protocol}://${host}`).replace(/\/$/, '');
       const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
