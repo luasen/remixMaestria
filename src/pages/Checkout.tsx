@@ -7,6 +7,7 @@ import { formatPrice } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Coupon } from '../types';
 import MercadoPagoCheckoutBrick from '../components/MercadoPagoCheckoutBrick';
+import OnlinePaymentMenu from '../components/OnlinePaymentMenu';
 import { fetchApi } from '../utils/api';
 
 export default function Checkout() {
@@ -31,8 +32,9 @@ export default function Checkout() {
   const [reference, setReference] = useState('');
   const [deliveryCoords, setDeliveryCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Mercado Pago vs Delivery payment options
+  // Payment options: Online (Checkout Transparente) vs Delivery (Offline)
   const [paymentOption, setPaymentOption] = useState<'mercadopago' | 'delivery'>('mercadopago');
+  const [onlineSubMethod, setOnlineSubMethod] = useState<'pix' | 'card' | 'all'>('pix');
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card' | 'cash'>('pix');
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -42,7 +44,6 @@ export default function Checkout() {
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
-  const [mpViewMode, setMpViewMode] = useState<'embedded' | 'brick'>('embedded');
   const [pixCopied, setPixCopied] = useState(false);
 
   // Coupon state
@@ -791,31 +792,31 @@ export default function Checkout() {
           <div className="rounded-3xl border border-white/35 bg-white/40 backdrop-blur-md p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-gray-400">Forma de Pagamento</h3>
-              <span className="flex items-center gap-1 text-[10px] font-extrabold text-sky-700 bg-sky-50 border border-sky-200/80 px-2 py-0.5 rounded-full">
-                <ShieldCheck className="h-3 w-3 text-sky-600" /> Mercado Pago
+              <span className="flex items-center gap-1 text-[10px] font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 rounded-full">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" /> Checkout Transparente
               </span>
             </div>
             
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                id="payment-option-mp"
+                id="payment-option-online"
                 onClick={() => {
                   setPaymentOption('mercadopago');
                   setPendingOrder(null);
                 }}
                 className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3.5 transition text-center ${
                   paymentOption === 'mercadopago'
-                    ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-extrabold border-orange-500/30'
+                    ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-extrabold border-orange-500/30 shadow-xs'
                     : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
                 }`}
               >
                 <div className="flex items-center gap-1">
-                  <ShieldCheck className="h-4 w-4 text-sky-600" />
-                  <span className="text-[11px] font-bold">Mercado Pago</span>
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-[11px] font-bold">Pagamento On-line</span>
                 </div>
                 <span className="text-[9px] text-gray-500 leading-tight">
-                  Pix, Cartão Crédito/Débito, Saldo MP
+                  Pix ou Cartão de Crédito/Débito
                 </span>
               </button>
 
@@ -825,7 +826,7 @@ export default function Checkout() {
                 onClick={() => setPaymentOption('delivery')}
                 className={`flex flex-col items-center gap-1.5 rounded-2xl border p-3.5 transition text-center ${
                   paymentOption === 'delivery'
-                    ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/30'
+                    ? 'border-orange-500 bg-orange-500/15 text-orange-600 font-bold border-orange-500/30 shadow-xs'
                     : 'border-white/30 bg-white/35 text-gray-500 hover:bg-white/60'
                 }`}
               >
@@ -838,6 +839,55 @@ export default function Checkout() {
                 </span>
               </button>
             </div>
+
+            {/* Sub-options for Pagamento On-line */}
+            {paymentOption === 'mercadopago' && (
+              <div className="pt-3 border-t border-white/20 space-y-2">
+                <p className="text-[10px] font-bold text-gray-500 uppercase">
+                  Escolha como deseja pagar on-line:
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setOnlineSubMethod('pix')}
+                    className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition text-center ${
+                      onlineSubMethod === 'pix'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-extrabold shadow-2xs'
+                        : 'border-gray-200/80 bg-white/50 text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    <span className="text-xs font-black text-emerald-600">⚡ Pix</span>
+                    <span className="text-[9px] text-gray-500 mt-0.5">Aprovação imediata</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOnlineSubMethod('card')}
+                    className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition text-center ${
+                      onlineSubMethod === 'card'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-extrabold shadow-2xs'
+                        : 'border-gray-200/80 bg-white/50 text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    <span className="text-xs font-black text-sky-600">💳 Cartão</span>
+                    <span className="text-[9px] text-gray-500 mt-0.5">Crédito ou Débito</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOnlineSubMethod('all')}
+                    className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition text-center ${
+                      onlineSubMethod === 'all'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-800 font-extrabold shadow-2xs'
+                        : 'border-gray-200/80 bg-white/50 text-gray-600 hover:bg-white'
+                    }`}
+                  >
+                    <span className="text-xs font-black text-purple-600">🌐 Todas</span>
+                    <span className="text-[9px] text-gray-500 mt-0.5">Pix e Cartão</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Offline Delivery Payment Methods */}
             {paymentOption === 'delivery' && (
@@ -893,15 +943,19 @@ export default function Checkout() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-3xl border border-sky-300/80 bg-white p-4 sm:p-5 shadow-lg space-y-4"
+              className="rounded-3xl border border-emerald-300/80 bg-white p-4 sm:p-5 shadow-lg space-y-4"
             >
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div>
-                  <span className="text-[10px] font-extrabold text-sky-700 uppercase tracking-wider block">
-                    Pagamento do Pedido #{pendingOrder.id}
+                  <span className="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider block">
+                    Pagamento On-line - Pedido #{pendingOrder.id}
                   </span>
                   <h4 className="text-sm font-extrabold text-gray-900">
-                    Mercado Pago (Pix, Cartão de Crédito ou Débito)
+                    {onlineSubMethod === 'pix'
+                      ? 'Pagamento via Pix (Checkout Transparente)'
+                      : onlineSubMethod === 'card'
+                      ? 'Pagamento via Cartão de Crédito/Débito'
+                      : 'Pagamento On-line (Pix ou Cartão)'}
                   </h4>
                 </div>
                 <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1">
@@ -909,94 +963,36 @@ export default function Checkout() {
                 </span>
               </div>
 
-              {/* View Selector Tabs */}
-              <div className="flex rounded-xl bg-sky-50 p-1 border border-sky-100 text-xs font-bold">
-                <button
-                  type="button"
-                  onClick={() => setMpViewMode('embedded')}
-                  className={`flex-1 py-2 px-3 rounded-lg transition ${
-                    mpViewMode === 'embedded'
-                      ? 'bg-sky-600 text-white shadow-sm font-extrabold'
-                      : 'text-sky-800 hover:text-sky-950 font-medium'
-                  }`}
-                >
-                  🌐 Checkout Mercado Pago (Na Tela)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMpViewMode('brick')}
-                  className={`flex-1 py-2 px-3 rounded-lg transition ${
-                    mpViewMode === 'brick'
-                      ? 'bg-sky-600 text-white shadow-sm font-extrabold'
-                      : 'text-sky-800 hover:text-sky-950 font-medium'
-                  }`}
-                >
-                  💳 Formulário Direto
-                </button>
+              {/* Online Payment Menu (Pix QR Code, Copia e Cola & Cartão) */}
+              <div className="pt-1">
+                <OnlinePaymentMenu
+                  amount={finalTotal}
+                  orderId={pendingOrder.id}
+                  customerName={name}
+                  customerEmail={user?.email || 'cliente@maestriagrill.com'}
+                  customerPhone={phone}
+                  selectedSubMethod={onlineSubMethod}
+                  items={cart.map((item) => ({
+                    productId: item.productId,
+                    productName: item.name,
+                    quantity: item.quantity,
+                    price: item.price,
+                  }))}
+                  deliveryFee={finalDeliveryFee}
+                  onSuccess={(result) => {
+                    setPlacedOrder({
+                      ...pendingOrder,
+                      paymentStatus: 'paid',
+                      statusPagamento: 'pago',
+                      status: 'pending',
+                    });
+                    clearCart();
+                  }}
+                  onError={(errMessage) => {
+                    setMpError(errMessage);
+                  }}
+                />
               </div>
-
-              {/* View Mode 1: Embedded Mercado Pago Checkout Frame */}
-              {mpViewMode === 'embedded' ? (
-                <div className="w-full rounded-2xl overflow-hidden border border-sky-200 bg-gray-50 shadow-inner space-y-2 p-1">
-                  <div className="bg-sky-600 px-3.5 py-2 text-white text-[11px] font-bold rounded-xl flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <ShieldCheck className="h-4 w-4" />
-                      Checkout Seguro Mercado Pago
-                    </span>
-                    <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">
-                      Conexão Criptografada
-                    </span>
-                  </div>
-
-                  {mpInitPoint ? (
-                    <iframe
-                      src={mpInitPoint}
-                      title="Mercado Pago Checkout"
-                      className="w-full h-[620px] rounded-xl border-0 bg-white"
-                      allow="payment"
-                    />
-                  ) : (
-                    <div className="p-8 text-center space-y-3">
-                      <div className="inline-block animate-spin text-sky-600">
-                        <ShieldCheck className="h-8 w-8" />
-                      </div>
-                      <p className="text-xs font-bold text-gray-700">
-                        Carregando ambiente de pagamento seguro...
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* View Mode 2: Mercado Pago Brick */
-                <div className="pt-2">
-                  <MercadoPagoCheckoutBrick
-                    amount={finalTotal}
-                    orderId={pendingOrder.id}
-                    customerName={name}
-                    customerEmail={user?.email || 'cliente@maestriagrill.com'}
-                    customerPhone={phone}
-                    items={cart.map((item) => ({
-                      productId: item.productId,
-                      productName: item.name,
-                      quantity: item.quantity,
-                      price: item.price,
-                    }))}
-                    deliveryFee={finalDeliveryFee}
-                    onSuccess={(result) => {
-                      setPlacedOrder({
-                        ...pendingOrder,
-                        paymentStatus: 'paid',
-                        statusPagamento: 'pago',
-                        status: 'pending',
-                      });
-                      clearCart();
-                    }}
-                    onError={(errMessage) => {
-                      setMpError(errMessage);
-                    }}
-                  />
-                </div>
-              )}
             </motion.div>
           )}
 

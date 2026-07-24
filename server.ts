@@ -253,6 +253,90 @@ async function startServer() {
     }
   });
 
+  // POST /api/mercadopago/create-pix (Direct Pix Generation via Mercado Pago API)
+  app.post('/api/mercadopago/create-pix', async (req, res) => {
+    try {
+      const { orderData } = req.body;
+      if (!orderData) {
+        return res.status(400).json({ error: 'Dados do pedido são obrigatórios.' });
+      }
+
+      const rawAppUrl = process.env.APP_URL;
+      const isPlaceholderAppUrl = !rawAppUrl || rawAppUrl === 'MY_APP_URL';
+      const host = req.headers['x-forwarded-host'] || req.get('host') || 'sheikcoin.site';
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      const appBaseUrl = (!isPlaceholderAppUrl ? rawAppUrl : `${protocol}://${host}`).replace(/\/$/, '');
+      const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+
+      const amount = Number(orderData.total || orderData.valorTotal || 0);
+      const customerEmail = String(orderData.customerEmail || 'cliente@maestriagrill.com').trim();
+      const validEmail = customerEmail.includes('@') && customerEmail.includes('.')
+        ? customerEmail
+        : 'cliente@maestriagrill.com';
+
+      const customerName = String(orderData.customerName || 'Cliente').trim();
+      const firstName = customerName ? customerName.split(' ')[0] : 'Cliente';
+      const lastName = customerName ? customerName.split(' ').slice(1).join(' ') || 'Maestria' : 'Grill';
+
+      const paymentBody: any = {
+        transaction_amount: amount,
+        description: `Pedido #${orderData.id} - Maestria Grill`,
+        payment_method_id: 'pix',
+        payer: {
+          email: validEmail,
+          first_name: firstName,
+          last_name: lastName,
+        },
+        external_reference: String(orderData.id),
+      };
+
+      if (orderData.cpf) {
+        const cleanCpf = String(orderData.cpf).replace(/\D/g, '');
+        if (cleanCpf.length === 11) {
+          paymentBody.payer.identification = { type: 'CPF', number: cleanCpf };
+        }
+      }
+
+      if (!isLocalhost && !appBaseUrl.includes('localhost')) {
+        paymentBody.notification_url = `${appBaseUrl}/api/mercadopago/webhook`;
+      }
+
+      console.log(`[Mercado Pago Direct Pix] Criando cobrança Pix para Pedido #${orderData.id} (R$ ${amount})...`);
+      const paymentResponse = await mpPayment.create({ body: paymentBody });
+
+      const qrCode = paymentResponse.point_of_interaction?.transaction_data?.qr_code;
+      const qrCodeBase64 = paymentResponse.point_of_interaction?.transaction_data?.qr_code_base64;
+      const ticketUrl = paymentResponse.point_of_interaction?.transaction_data?.ticket_url;
+
+      // Save payment ID to Firestore order record
+      try {
+        const orderRef = doc(db, 'orders', String(orderData.id));
+        await updateDoc(orderRef, {
+          mercadopagoPaymentId: String(paymentResponse.id),
+          mercadopagoStatus: paymentResponse.status,
+          mercadopagoPaymentMethod: 'pix',
+        });
+      } catch (dbErr) {
+        console.error(`[Firestore Error] Erro ao salvar dados do Pix no pedido #${orderData.id}:`, dbErr);
+      }
+
+      return res.json({
+        success: true,
+        paymentId: paymentResponse.id,
+        status: paymentResponse.status,
+        qrCode,
+        qrCodeBase64,
+        ticketUrl,
+      });
+    } catch (error: any) {
+      console.error('[Mercado Pago Direct Pix Error]:', error?.cause || error?.message || error);
+      return res.status(500).json({
+        error: 'Erro ao gerar QR Code Pix no Mercado Pago',
+        details: error?.cause?.[0]?.description || error?.message || String(error),
+      });
+    }
+  });
+
   // POST /api/mercadopago/webhook (Automated Webhook Notification Handler)
   app.post('/api/mercadopago/webhook', async (req, res) => {
     try {
