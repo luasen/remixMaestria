@@ -56,6 +56,15 @@ var mpPreference = new import_mercadopago.Preference(mpClient);
 async function startServer() {
   const app = (0, import_express.default)();
   const PORT = 3e3;
+  app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    next();
+  });
   app.use(import_express.default.json());
   app.use(import_express.default.urlencoded({ extended: true }));
   app.get("/api/health", (req, res) => {
