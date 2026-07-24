@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { initMercadoPago, Payment, StatusScreen } from '@mercadopago/sdk-react';
 import { Loader2, ShieldCheck, Lock, AlertCircle } from 'lucide-react';
+import { fetchApi } from '../utils/api';
 
 interface MercadoPagoCheckoutBrickProps {
   amount: number;
@@ -50,7 +51,7 @@ export default function MercadoPagoCheckoutBrick({
       try {
         setLoadingPref(true);
         setPrefError(null);
-        const res = await fetch('/api/mercadopago/create-preference', {
+        const data = await fetchApi('/api/mercadopago/create-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -66,18 +67,8 @@ export default function MercadoPagoCheckoutBrick({
           }),
         });
 
-        const contentType = res.headers.get('content-type') || '';
-        let data: any = {};
-        if (contentType.includes('application/json')) {
-          data = await res.json();
-        } else {
-          const text = await res.text();
-          console.error('[Mercado Pago Preference Error - Non JSON]:', text);
-          throw new Error('Servidor indisponível ou resposta inválida ao gerar preferência.');
-        }
-
-        if (!res.ok || !data.id) {
-          throw new Error(data.details || data.error || 'Falha ao gerar a preferência de pagamento do Mercado Pago.');
+        if (!data || !data.id) {
+          throw new Error('Falha ao gerar a preferência de pagamento do Mercado Pago.');
         }
 
         if (isMounted) {
@@ -105,8 +96,8 @@ export default function MercadoPagoCheckoutBrick({
   // Handle payment processing via official Brick callback
   const handleSubmit = async (param: any) => {
     const { formData } = param;
-    return new Promise<void>((resolve, reject) => {
-      fetch('/api/mercadopago/process-payment', {
+    try {
+      const result = await fetchApi('/api/mercadopago/process-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -121,36 +112,26 @@ export default function MercadoPagoCheckoutBrick({
             items,
           },
         }),
-      })
-        .then(async (res) => {
-          const contentType = res.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            return res.json();
-          }
-          throw new Error('Servidor indisponível ou resposta inválida.');
-        })
-        .then((result) => {
-          if (result.success && result.id) {
-            const newPaymentId = String(result.id);
-            setPaymentId(newPaymentId);
+      });
 
-            if (result.status === 'approved') {
-              onSuccess(result);
-            }
-            resolve();
-          } else {
-            const errorMsg = result.error || result.details || 'Falha ao processar pagamento.';
-            onError(errorMsg);
-            reject(new Error(errorMsg));
-          }
-        })
-        .catch((err) => {
-          console.error('[Process Payment Exception]:', err);
-          const errMsg = 'Erro na comunicação com o servidor de pagamentos.';
-          onError(errMsg);
-          reject(new Error(errMsg));
-        });
-    });
+      if (result && result.success && result.id) {
+        const newPaymentId = String(result.id);
+        setPaymentId(newPaymentId);
+
+        if (result.status === 'approved') {
+          onSuccess(result);
+        }
+      } else {
+        const errorMsg = result?.error || result?.details || 'Falha ao processar pagamento.';
+        onError(errorMsg);
+        throw new Error(errorMsg);
+      }
+    } catch (err: any) {
+      console.error('[Process Payment Exception]:', err);
+      const errMsg = err.message || 'Erro na comunicação com o servidor de pagamentos.';
+      onError(errMsg);
+      throw new Error(errMsg);
+    }
   };
 
   // If payment was created, render the official Mercado Pago StatusScreen Brick

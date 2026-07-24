@@ -7,6 +7,7 @@ import { formatPrice } from '../utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { Coupon } from '../types';
 import MercadoPagoCheckoutBrick from '../components/MercadoPagoCheckoutBrick';
+import { fetchApi } from '../utils/api';
 
 export default function Checkout() {
   const { cart, subtotal, deliveryFee, clearCart } = useCart();
@@ -41,6 +42,7 @@ export default function Checkout() {
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
   const [mpError, setMpError] = useState<string | null>(null);
+  const [mpViewMode, setMpViewMode] = useState<'embedded' | 'brick'>('embedded');
   const [pixCopied, setPixCopied] = useState(false);
 
   // Coupon state
@@ -276,9 +278,9 @@ export default function Checkout() {
 
         setPendingOrder(newOrder);
 
-        // Fetch preference and automatically open Mercado Pago tab
+        // Fetch Mercado Pago preference using fetchApi
         try {
-          const prefRes = await fetch('/api/mercadopago/create-preference', {
+          const prefData = await fetchApi('/api/mercadopago/create-preference', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -294,22 +296,15 @@ export default function Checkout() {
             }),
           });
 
-          const contentType = prefRes.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            const prefData = await prefRes.json();
-            if (prefRes.ok && prefData && (prefData.init_point || prefData.sandbox_init_point)) {
-              const redirectUrl = prefData.init_point || prefData.sandbox_init_point;
-              setMpInitPoint(redirectUrl);
-              // Open direct Mercado Pago checkout tab
-              window.open(redirectUrl, '_blank');
-            } else if (prefData.error) {
-              setMpError(prefData.details || prefData.error);
-            }
-          } else {
-            console.error('Resposta não-JSON ao criar preferência do Mercado Pago.');
+          if (prefData && (prefData.init_point || prefData.sandbox_init_point)) {
+            const redirectUrl = prefData.init_point || prefData.sandbox_init_point;
+            setMpInitPoint(redirectUrl);
+          } else if (prefData && prefData.error) {
+            setMpError(prefData.details || prefData.error);
           }
-        } catch (prefErr) {
+        } catch (prefErr: any) {
           console.error('Erro ao gerar preferência Mercado Pago:', prefErr);
+          setMpError(prefErr.message || 'Erro ao comunicar com Mercado Pago.');
         }
       } catch (err: any) {
         console.error('Error creating order for Mercado Pago:', err);
@@ -898,7 +893,7 @@ export default function Checkout() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-3xl border border-sky-300/80 bg-white p-5 shadow-lg space-y-4"
+              className="rounded-3xl border border-sky-300/80 bg-white p-4 sm:p-5 shadow-lg space-y-4"
             >
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div>
@@ -906,7 +901,7 @@ export default function Checkout() {
                     Pagamento do Pedido #{pendingOrder.id}
                   </span>
                   <h4 className="text-sm font-extrabold text-gray-900">
-                    Mercado Pago Checkout
+                    Mercado Pago (Pix, Cartão de Crédito ou Débito)
                   </h4>
                 </div>
                 <span className="text-sm font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1">
@@ -914,59 +909,94 @@ export default function Checkout() {
                 </span>
               </div>
 
-              {/* Direct Tab Action Banner */}
-              {mpInitPoint && (
-                <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl space-y-2.5 text-center">
-                  <div className="flex items-center justify-center gap-2 text-sky-900 font-extrabold text-xs">
-                    <ExternalLink className="h-4 w-4 text-sky-600" />
-                    <span>Pagamento Direto no Mercado Pago</span>
+              {/* View Selector Tabs */}
+              <div className="flex rounded-xl bg-sky-50 p-1 border border-sky-100 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setMpViewMode('embedded')}
+                  className={`flex-1 py-2 px-3 rounded-lg transition ${
+                    mpViewMode === 'embedded'
+                      ? 'bg-sky-600 text-white shadow-sm font-extrabold'
+                      : 'text-sky-800 hover:text-sky-950 font-medium'
+                  }`}
+                >
+                  🌐 Checkout Mercado Pago (Na Tela)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMpViewMode('brick')}
+                  className={`flex-1 py-2 px-3 rounded-lg transition ${
+                    mpViewMode === 'brick'
+                      ? 'bg-sky-600 text-white shadow-sm font-extrabold'
+                      : 'text-sky-800 hover:text-sky-950 font-medium'
+                  }`}
+                >
+                  💳 Formulário Direto
+                </button>
+              </div>
+
+              {/* View Mode 1: Embedded Mercado Pago Checkout Frame */}
+              {mpViewMode === 'embedded' ? (
+                <div className="w-full rounded-2xl overflow-hidden border border-sky-200 bg-gray-50 shadow-inner space-y-2 p-1">
+                  <div className="bg-sky-600 px-3.5 py-2 text-white text-[11px] font-bold rounded-xl flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4" />
+                      Checkout Seguro Mercado Pago
+                    </span>
+                    <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-semibold">
+                      Conexão Criptografada
+                    </span>
                   </div>
-                  <p className="text-[11px] text-sky-800 leading-relaxed font-medium">
-                    A aba oficial do Mercado Pago foi aberta. Caso não tenha aberto automaticamente no seu navegador, clique no botão abaixo para efetuar o pagamento com Pix, Cartão ou Saldo:
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => window.open(mpInitPoint, '_blank')}
-                    className="w-full flex items-center justify-center gap-2 bg-sky-600 text-white text-xs font-extrabold py-3 px-4 rounded-xl shadow-md hover:bg-sky-700 active:scale-98 transition"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Abrir Checkout Direto no Mercado Pago
-                  </button>
+
+                  {mpInitPoint ? (
+                    <iframe
+                      src={mpInitPoint}
+                      title="Mercado Pago Checkout"
+                      className="w-full h-[620px] rounded-xl border-0 bg-white"
+                      allow="payment"
+                    />
+                  ) : (
+                    <div className="p-8 text-center space-y-3">
+                      <div className="inline-block animate-spin text-sky-600">
+                        <ShieldCheck className="h-8 w-8" />
+                      </div>
+                      <p className="text-xs font-bold text-gray-700">
+                        Carregando ambiente de pagamento seguro...
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* View Mode 2: Mercado Pago Brick */
+                <div className="pt-2">
+                  <MercadoPagoCheckoutBrick
+                    amount={finalTotal}
+                    orderId={pendingOrder.id}
+                    customerName={name}
+                    customerEmail={user?.email || 'cliente@maestriagrill.com'}
+                    customerPhone={phone}
+                    items={cart.map((item) => ({
+                      productId: item.productId,
+                      productName: item.name,
+                      quantity: item.quantity,
+                      price: item.price,
+                    }))}
+                    deliveryFee={finalDeliveryFee}
+                    onSuccess={(result) => {
+                      setPlacedOrder({
+                        ...pendingOrder,
+                        paymentStatus: 'paid',
+                        statusPagamento: 'pago',
+                        status: 'pending',
+                      });
+                      clearCart();
+                    }}
+                    onError={(errMessage) => {
+                      setMpError(errMessage);
+                    }}
+                  />
                 </div>
               )}
-
-              {/* Or Pay directly inside the embedded Brick */}
-              <div className="pt-2">
-                <p className="text-[10px] text-gray-400 font-bold uppercase mb-2 text-center">
-                  Ou pague diretamente por aqui:
-                </p>
-                <MercadoPagoCheckoutBrick
-                  amount={finalTotal}
-                  orderId={pendingOrder.id}
-                  customerName={name}
-                  customerEmail={user?.email || 'cliente@maestriagrill.com'}
-                  customerPhone={phone}
-                  items={cart.map((item) => ({
-                    productId: item.productId,
-                    productName: item.name,
-                    quantity: item.quantity,
-                    price: item.price,
-                  }))}
-                  deliveryFee={finalDeliveryFee}
-                  onSuccess={(result) => {
-                    setPlacedOrder({
-                      ...pendingOrder,
-                      paymentStatus: 'paid',
-                      statusPagamento: 'pago',
-                      status: 'pending',
-                    });
-                    clearCart();
-                  }}
-                  onError={(errMessage) => {
-                    setMpError(errMessage);
-                  }}
-                />
-              </div>
             </motion.div>
           )}
 
