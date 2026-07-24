@@ -1,46 +1,49 @@
-// Helper to perform API requests with fallback to Cloud Run server if hosted statically on Hostinger or custom domain
-const CLOUD_RUN_BACKEND = 'https://ais-pre-mspmaj3jr76kak5lfjtw3r-421365387983.us-west1.run.app';
-
+// Helper to perform API requests with support for custom backend URL (VITE_API_URL) or relative host
 export async function fetchApi(endpoint: string, options: RequestInit = {}): Promise<any> {
+  const customApiUrl = import.meta.env.VITE_API_URL;
   const isAbsolute = endpoint.startsWith('http://') || endpoint.startsWith('https://');
-  const path = isAbsolute ? endpoint : (endpoint.startsWith('/') ? endpoint : '/' + endpoint);
 
-  // If already absolute URL
-  if (isAbsolute) {
-    const res = await fetch(path, options);
+  let targetUrl = endpoint;
+  if (!isAbsolute) {
+    const cleanPath = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+    if (customApiUrl) {
+      targetUrl = `${customApiUrl.replace(/\/$/, '')}${cleanPath}`;
+    } else {
+      targetUrl = cleanPath;
+    }
+  }
+
+  try {
+    const res = await fetch(targetUrl, options);
     const contentType = res.headers.get('content-type') || '';
+
     if (contentType.includes('application/json')) {
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.details || data.error || `Erro na requisição (${res.status})`);
+        throw new Error(data.details || data.error || `Erro HTTP ${res.status}`);
       }
       return data;
     }
-    throw new Error('Servidor retornou formato não-JSON.');
-  }
 
-  // 1. Try relative path on current host
-  try {
-    const res = await fetch(path, options);
-    const contentType = res.headers.get('content-type') || '';
-    if (res.ok && contentType.includes('application/json')) {
-      return await res.json();
-    }
-  } catch (err) {
-    console.warn('[fetchApi] Chamada relativa falhou, tentando servidor principal...', err);
-  }
-
-  // 2. Fallback to Cloud Run backend URL if host is serving static HTML (e.g. Hostinger sheikcoin.site)
-  const fallbackUrl = `${CLOUD_RUN_BACKEND}${path}`;
-  const res = await fetch(fallbackUrl, options);
-  const contentType = res.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    const data = await res.json();
+    // If server returned non-JSON (e.g. 404 HTML from static hosting)
     if (!res.ok) {
-      throw new Error(data.details || data.error || `Erro HTTP ${res.status}`);
+      if (res.status === 404) {
+        throw new Error(
+          'Servidor Node.js de pagamentos não encontrado. Certifique-se de que o backend (node dist/server.cjs) está rodando na Hostinger.'
+        );
+      }
+      throw new Error(`Servidor respondeu com código ${res.status}.`);
     }
-    return data;
-  }
 
-  throw new Error('Servidor de pagamentos temporariamente indisponível. Tente novamente em alguns segundos.');
+    throw new Error('Servidor respondeu num formato inválido (esperava-se JSON).');
+  } catch (err: any) {
+    console.error('[fetchApi Error]:', err);
+    if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      throw new Error(
+        'Falha de conexão com o servidor de pagamentos. Verifique se o backend Node.js está rodando ou se há bloqueio de CORS.'
+      );
+    }
+    throw err;
+  }
 }
+
