@@ -47,6 +47,7 @@ var firebase_applet_config_default = {
 var firebaseServerApp = (0, import_app.initializeApp)(firebase_applet_config_default, "server-app");
 var db = (0, import_firestore.getFirestore)(firebaseServerApp, firebase_applet_config_default.firestoreDatabaseId);
 var MERCADOPAGO_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || "APP_USR-4612394528193802-072320-97e3710081e80df08135f600e23b1d04-493924237";
+var MERCADOPAGO_WEBHOOK_SECRET = process.env.MERCADOPAGO_WEBHOOK_SECRET || "f155fb42eb7fd544095dd9e43c10c56f1a39612f53160566798f6535ee555b72";
 var mpClient = new import_mercadopago.MercadoPagoConfig({
   accessToken: MERCADOPAGO_ACCESS_TOKEN
 });
@@ -75,10 +76,10 @@ async function startServer() {
           error: "Dados do pagamento e do pedido s\xE3o obrigat\xF3rios."
         });
       }
-      const host = req.get("host") || "localhost:3000";
+      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
       const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
       const appBaseUrl = process.env.APP_URL || `${protocol}://${host}`;
-      const notificationUrl = `${appBaseUrl}/api/mercadopago/webhook`;
+      const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
       const amount = Number(formData.transaction_amount || orderData.total);
       const email = formData.payer?.email || orderData.customerEmail || "cliente@maestriagrill.com";
       const firstName = formData.payer?.first_name || (orderData.customerName ? orderData.customerName.split(" ")[0] : "Cliente");
@@ -95,9 +96,11 @@ async function startServer() {
           identification: formData.payer?.identification
         },
         installments: Number(formData.installments || 1),
-        external_reference: String(orderData.id),
-        notification_url: notificationUrl
+        external_reference: String(orderData.id)
       };
+      if (!isLocalhost && !appBaseUrl.includes("localhost")) {
+        paymentBody.notification_url = `${appBaseUrl}/api/mercadopago/webhook`;
+      }
       if (formData.issuer_id) {
         paymentBody.issuer_id = String(formData.issuer_id);
       }
@@ -143,10 +146,10 @@ async function startServer() {
         payment: paymentResponse
       });
     } catch (error) {
-      console.error("[Mercado Pago API Error] Falha no processamento:", error);
+      console.error("[Mercado Pago API Error] Falha no processamento:", error?.cause || error?.message || error);
       return res.status(500).json({
         error: "Erro ao processar pagamento com o Mercado Pago",
-        details: error.message || error
+        details: error?.cause?.[0]?.description || error?.message || String(error)
       });
     }
   });
@@ -156,17 +159,26 @@ async function startServer() {
       if (!orderData) {
         return res.status(400).json({ error: "Dados do pedido s\xE3o obrigat\xF3rios." });
       }
-      const host = req.get("host") || "localhost:3000";
+      const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3000";
       const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
       const appBaseUrl = process.env.APP_URL || `${protocol}://${host}`;
-      const items = (orderData.items || []).map((item) => ({
-        id: String(item.productId || "item"),
-        title: item.productName || "Item do Pedido",
-        unit_price: Number(item.price),
-        quantity: Number(item.quantity),
+      const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+      let items = (orderData.items || []).map((item) => ({
+        id: String(item.productId || item.id || "item"),
+        title: String(item.productName || item.title || item.name || "Item do Pedido").trim() || "Item do Pedido",
+        unit_price: Number(item.price || item.unit_price || 0),
+        quantity: Number(item.quantity || 1),
         currency_id: "BRL"
-      }));
-      if (orderData.deliveryFee && orderData.deliveryFee > 0) {
+      })).filter((i) => i.unit_price > 0 && i.quantity > 0);
+      if (items.length === 0) {
+        items = [{
+          id: String(orderData.id || "pedido"),
+          title: `Pedido #${orderData.id || ""} - Maestria Grill`,
+          unit_price: Number(orderData.total || orderData.valorTotal || 1),
+          quantity: 1,
+          currency_id: "BRL"
+        }];
+      } else if (orderData.deliveryFee && Number(orderData.deliveryFee) > 0) {
         items.push({
           id: "delivery_fee",
           title: "Taxa de Entrega",
@@ -175,33 +187,37 @@ async function startServer() {
           currency_id: "BRL"
         });
       }
-      const prefResponse = await mpPreference.create({
-        body: {
-          items,
-          payer: {
-            name: orderData.customerName || "Cliente",
-            email: orderData.customerEmail || "cliente@maestriagrill.com"
-          },
-          external_reference: String(orderData.id),
-          notification_url: `${appBaseUrl}/api/mercadopago/webhook`,
-          back_urls: {
-            success: `${appBaseUrl}/?orderId=${orderData.id}&payment=success`,
-            failure: `${appBaseUrl}/?orderId=${orderData.id}&payment=failure`,
-            pending: `${appBaseUrl}/?orderId=${orderData.id}&payment=pending`
-          },
-          auto_return: "approved"
-        }
-      });
-      res.json({
+      const customerEmail = String(orderData.customerEmail || "cliente@maestriagrill.com").trim();
+      const validEmail = customerEmail.includes("@") && customerEmail.includes(".") ? customerEmail : "cliente@maestriagrill.com";
+      const bodyData = {
+        items,
+        payer: {
+          name: String(orderData.customerName || "Cliente").trim() || "Cliente",
+          email: validEmail
+        },
+        external_reference: String(orderData.id),
+        back_urls: {
+          success: `${appBaseUrl}/?orderId=${orderData.id}&payment=success`,
+          failure: `${appBaseUrl}/?orderId=${orderData.id}&payment=failure`,
+          pending: `${appBaseUrl}/?orderId=${orderData.id}&payment=pending`
+        },
+        auto_return: "approved"
+      };
+      if (!isLocalhost && !appBaseUrl.includes("localhost")) {
+        bodyData.notification_url = `${appBaseUrl}/api/mercadopago/webhook`;
+      }
+      console.log(`[Mercado Pago Preference] Criando prefer\xEAncia para Pedido #${orderData.id}...`);
+      const prefResponse = await mpPreference.create({ body: bodyData });
+      return res.json({
         id: prefResponse.id,
         init_point: prefResponse.init_point,
         sandbox_init_point: prefResponse.sandbox_init_point
       });
     } catch (error) {
-      console.error("[Mercado Pago Preference Error]:", error);
-      res.status(500).json({
+      console.error("[Mercado Pago Preference Error]:", error?.cause || error?.message || error);
+      return res.status(500).json({
         error: "Erro ao criar prefer\xEAncia de pagamento",
-        details: error.message || error
+        details: error?.cause?.[0]?.description || error?.message || String(error)
       });
     }
   });
