@@ -18,7 +18,7 @@ const MERCADOPAGO_ACCESS_TOKEN =
 
 const MERCADOPAGO_WEBHOOK_SECRET =
   process.env.MERCADOPAGO_WEBHOOK_SECRET ||
-  'f155fb42eb7fd544095dd9e43c10c56f1a39612f53160566798f6535ee555b72';
+  '5b243ea8deba910f74cc4cb3553a2876a82af67f992c816108d5abd286d0a686';
 
 const mpClient = new MercadoPagoConfig({
   accessToken: MERCADOPAGO_ACCESS_TOKEN,
@@ -344,6 +344,11 @@ async function startServer() {
     }
   });
 
+  // GET /api/mercadopago/webhook (Health Check / Test ping)
+  app.get('/api/mercadopago/webhook', (_req, res) => {
+    return res.status(200).json({ status: 'ok', message: 'Webhook Mercado Pago ativo e operacional.' });
+  });
+
   // POST /api/mercadopago/webhook (Automated Webhook Notification Handler)
   app.post('/api/mercadopago/webhook', async (req, res) => {
     try {
@@ -364,6 +369,33 @@ async function startServer() {
 
       if (!paymentId) {
         return res.status(200).send('Webhook recebido sem ID de pagamento.');
+      }
+
+      // Validar Assinatura do Webhook (x-signature) se fornecida pelo Mercado Pago
+      const xSignature = req.headers['x-signature'] as string;
+      const xRequestId = req.headers['x-request-id'] as string;
+      if (xSignature && MERCADOPAGO_WEBHOOK_SECRET) {
+        try {
+          const parts = xSignature.split(',');
+          let ts = '';
+          let hashV1 = '';
+          for (const part of parts) {
+            const [key, val] = part.trim().split('=');
+            if (key === 'ts') ts = val;
+            if (key === 'v1') hashV1 = val;
+          }
+          if (ts && hashV1) {
+            const manifest = `id:${paymentId};request-id:${xRequestId || ''};ts:${ts};`;
+            const calculatedHash = crypto.createHmac('sha256', MERCADOPAGO_WEBHOOK_SECRET).update(manifest).digest('hex');
+            if (calculatedHash === hashV1) {
+              console.log('[Mercado Pago Webhook] Assinatura X-Signature validada com sucesso.');
+            } else {
+              console.warn(`[Mercado Pago Webhook] Alerta: Assinatura X-Signature não coincidiu (Calculada: ${calculatedHash}, Recebida: ${hashV1}). Prosseguindo com consulta de segurança na API do MP.`);
+            }
+          }
+        } catch (sigErr) {
+          console.error('[Mercado Pago Webhook Signature Validation Warning]:', sigErr);
+        }
       }
 
       console.log(`[Mercado Pago Webhook] Consultando status do Pagamento #${paymentId}...`);
