@@ -24,6 +24,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server.ts
 var import_express = __toESM(require("express"), 1);
 var import_path = __toESM(require("path"), 1);
+var import_crypto = __toESM(require("crypto"), 1);
 var import_vite = require("vite");
 var import_mercadopago = require("mercadopago");
 var import_app = require("firebase/app");
@@ -47,7 +48,7 @@ var firebase_applet_config_default = {
 var firebaseServerApp = (0, import_app.initializeApp)(firebase_applet_config_default, "server-app");
 var db = (0, import_firestore.getFirestore)(firebaseServerApp, firebase_applet_config_default.firestoreDatabaseId);
 var MERCADOPAGO_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || "APP_USR-4612394528193802-072320-97e3710081e80df08135f600e23b1d04-493924237";
-var MERCADOPAGO_WEBHOOK_SECRET = process.env.MERCADOPAGO_WEBHOOK_SECRET || "f155fb42eb7fd544095dd9e43c10c56f1a39612f53160566798f6535ee555b72";
+var MERCADOPAGO_WEBHOOK_SECRET = process.env.MERCADOPAGO_WEBHOOK_SECRET || "5b243ea8deba910f74cc4cb3553a2876a82af67f992c816108d5abd286d0a686";
 var mpClient = new import_mercadopago.MercadoPagoConfig({
   accessToken: MERCADOPAGO_ACCESS_TOKEN
 });
@@ -310,6 +311,9 @@ async function startServer() {
       });
     }
   });
+  app.get("/api/mercadopago/webhook", (_req, res) => {
+    return res.status(200).json({ status: "ok", message: "Webhook Mercado Pago ativo e operacional." });
+  });
   app.post("/api/mercadopago/webhook", async (req, res) => {
     try {
       console.log("[Mercado Pago Webhook Received]:", JSON.stringify(req.query), JSON.stringify(req.body));
@@ -321,6 +325,31 @@ async function startServer() {
       const paymentId = req.query.id || req.query["data.id"] || req.body?.data?.id || (req.body?.type === "payment" ? req.body?.data?.id : null) || req.body?.id;
       if (!paymentId) {
         return res.status(200).send("Webhook recebido sem ID de pagamento.");
+      }
+      const xSignature = req.headers["x-signature"];
+      const xRequestId = req.headers["x-request-id"];
+      if (xSignature && MERCADOPAGO_WEBHOOK_SECRET) {
+        try {
+          const parts = xSignature.split(",");
+          let ts = "";
+          let hashV1 = "";
+          for (const part of parts) {
+            const [key, val] = part.trim().split("=");
+            if (key === "ts") ts = val;
+            if (key === "v1") hashV1 = val;
+          }
+          if (ts && hashV1) {
+            const manifest = `id:${paymentId};request-id:${xRequestId || ""};ts:${ts};`;
+            const calculatedHash = import_crypto.default.createHmac("sha256", MERCADOPAGO_WEBHOOK_SECRET).update(manifest).digest("hex");
+            if (calculatedHash === hashV1) {
+              console.log("[Mercado Pago Webhook] Assinatura X-Signature validada com sucesso.");
+            } else {
+              console.warn(`[Mercado Pago Webhook] Alerta: Assinatura X-Signature n\xE3o coincidiu (Calculada: ${calculatedHash}, Recebida: ${hashV1}). Prosseguindo com consulta de seguran\xE7a na API do MP.`);
+            }
+          }
+        } catch (sigErr) {
+          console.error("[Mercado Pago Webhook Signature Validation Warning]:", sigErr);
+        }
       }
       console.log(`[Mercado Pago Webhook] Consultando status do Pagamento #${paymentId}...`);
       let paymentInfo = null;
