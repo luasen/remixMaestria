@@ -6,6 +6,7 @@ import Header from './components/Header';
 import BottomNav from './components/BottomNav';
 import AuthModal from './components/AuthModal';
 import MotoboyOrderNotification from './components/MotoboyOrderNotification';
+import InstallAppPrompt from './components/InstallAppPrompt';
 import Home from './pages/Home';
 import Menu from './pages/Menu';
 import Cart from './pages/Cart';
@@ -145,6 +146,9 @@ function AppContent() {
 
       {/* Motoboy Real-time Delivery Order Popup */}
       <MotoboyOrderNotification />
+
+      {/* App Installation Banner / Modal Notification */}
+      <InstallAppPrompt />
 
       {/* Auth Modal overlay at absolute top layer */}
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />

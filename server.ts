@@ -28,8 +28,7 @@ const mpPreference = new Preference(mpClient);
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
-  const NODE_ENV = process.env.NODE_ENV || 'development';
+  const PORT = 3000;
 
   // CORS Middleware for Hostinger and external cross-origin requests (e.g. maestriagrill.site)
   app.use((req, res, next) => {
@@ -54,7 +53,7 @@ async function startServer() {
 
   // Health check
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', service: 'Maestria Grill Mercado Pago API', environment: NODE_ENV });
+    res.json({ status: 'ok', service: 'Maestria Grill Mercado Pago API' });
   });
 
   // GET Mercado Pago Config Info
@@ -391,7 +390,7 @@ async function startServer() {
             if (calculatedHash === hashV1) {
               console.log('[Mercado Pago Webhook] Assinatura X-Signature validada com sucesso.');
             } else {
-              console.warn(`[Mercado Pago Webhook] Alerta: Assinatura X-Signature não coincidiu (Calculada: ${calculatedHash}, Recebida: ${hashV1}). Prosseguindo com consulta de segurança na API.`);
+              console.warn(`[Mercado Pago Webhook] Alerta: Assinatura X-Signature não coincidiu (Calculada: ${calculatedHash}, Recebida: ${hashV1}). Prosseguindo com consulta de segurança na API do MP.`);
             }
           }
         } catch (sigErr) {
@@ -511,44 +510,22 @@ async function startServer() {
   });
 
   // Vite middleware for development or static serving for production
-  if (NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    // Production: Serve static files
     const distPath = path.join(process.cwd(), 'dist');
-    
-    // Compression and caching headers
-    app.use((req, res, next) => {
-      if (req.path.startsWith('/assets/')) {
-        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      } else if (req.path.endsWith('.html')) {
-        res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
-      } else {
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-      }
-      next();
-    });
-    
-    // Serve static files
     app.use(express.static(distPath));
-    
-    // SPA fallback: All non-API routes return index.html
     app.get('*', (req, res) => {
-      // Only serve index.html for non-API requests
-      if (!req.path.startsWith('/api/')) {
-        res.sendFile(path.join(distPath, 'index.html'));
-      } else {
-        res.status(404).json({ error: 'API endpoint not found' });
-      }
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[Server] Maestria Grill rodando na porta ${PORT} (${NODE_ENV})`);
+    console.log(`[Server] Maestria Grill rodando na porta ${PORT}`);
   });
 }
 
