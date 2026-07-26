@@ -1,5 +1,6 @@
-// Helper to perform API requests with support for custom backend URL (VITE_API_URL), Cloud Run production backend fallback, or relative host
-export const CLOUD_RUN_API_URL = 'https://ais-pre-mspmaj3jr76kak5lfjtw3r-421365387983.us-west1.run.app';
+// Helper to perform API requests with support for custom backend URL (VITE_API_URL), Render production backend fallback, or relative host
+export const RENDER_API_URL = 'https://maestriagrill-backend.onrender.com';
+export const CLOUD_RUN_API_URL = RENDER_API_URL;
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}): Promise<any> {
   const customApiUrl = import.meta.env.VITE_API_URL;
@@ -8,7 +9,8 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
   const isExternalHost = typeof window !== 'undefined' &&
     window.location.hostname !== 'localhost' &&
     window.location.hostname !== '127.0.0.1' &&
-    !window.location.hostname.endsWith('run.app');
+    !window.location.hostname.endsWith('run.app') &&
+    !window.location.hostname.endsWith('onrender.com');
 
   let primaryUrl = endpoint;
   if (!isAbsolute) {
@@ -16,14 +18,14 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
     if (customApiUrl) {
       primaryUrl = `${customApiUrl.replace(/\/$/, '')}${cleanPath}`;
     } else if (isExternalHost) {
-      // Direct call to Cloud Run backend when running on external domains (e.g. Hostinger, sheikcoin.site)
-      primaryUrl = `${CLOUD_RUN_API_URL.replace(/\/$/, '')}${cleanPath}`;
+      // Direct call to Render backend when running on external domains (e.g. Hostinger maestriagrill.site)
+      primaryUrl = `${RENDER_API_URL.replace(/\/$/, '')}${cleanPath}`;
     } else {
       primaryUrl = cleanPath;
     }
   }
 
-  // Attempt request with primary URL, and fallback to Cloud Run if primary relative request returns non-JSON or network error
+  // Attempt request with primary URL, and fallback to Render if primary relative request returns non-JSON or network error
   try {
     const res = await fetch(primaryUrl, options);
     const contentType = res.headers.get('content-type') || '';
@@ -36,11 +38,11 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
       return data;
     }
 
-    // If primary returned non-JSON (e.g. 404 index.html on static Hostinger site) and we haven't tried Cloud Run directly yet
-    if (!isAbsolute && !primaryUrl.startsWith(CLOUD_RUN_API_URL)) {
+    // If primary returned non-JSON (e.g. 404 index.html on static Hostinger site) and we haven't tried Render directly yet
+    if (!isAbsolute && !primaryUrl.startsWith(RENDER_API_URL)) {
       const cleanPath = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
-      const fallbackUrl = `${CLOUD_RUN_API_URL.replace(/\/$/, '')}${cleanPath}`;
-      console.warn(`[fetchApi] Resposta não-JSON de ${primaryUrl}. Tentando fallback no Cloud Run: ${fallbackUrl}`);
+      const fallbackUrl = `${RENDER_API_URL.replace(/\/$/, '')}${cleanPath}`;
+      console.warn(`[fetchApi] Resposta não-JSON de ${primaryUrl}. Tentando fallback no Render: ${fallbackUrl}`);
       
       const fallbackRes = await fetch(fallbackUrl, options);
       const fallbackContentType = fallbackRes.headers.get('content-type') || '';
@@ -60,12 +62,12 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
 
     throw new Error('Resposta do servidor em formato inesperado (não é JSON).');
   } catch (err: any) {
-    // If network error occurred on relative URL, try Cloud Run as last resort
-    if (!isAbsolute && !primaryUrl.startsWith(CLOUD_RUN_API_URL)) {
+    // If network error occurred on relative URL, try Render as last resort
+    if (!isAbsolute && !primaryUrl.startsWith(RENDER_API_URL)) {
       try {
         const cleanPath = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
-        const fallbackUrl = `${CLOUD_RUN_API_URL.replace(/\/$/, '')}${cleanPath}`;
-        console.warn(`[fetchApi Network Retry] Tentando Cloud Run backend em ${fallbackUrl}`);
+        const fallbackUrl = `${RENDER_API_URL.replace(/\/$/, '')}${cleanPath}`;
+        console.warn(`[fetchApi Network Retry] Tentando Render backend em ${fallbackUrl}`);
         
         const retryRes = await fetch(fallbackUrl, options);
         const retryContentType = retryRes.headers.get('content-type') || '';
@@ -78,7 +80,7 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}): Pro
           return retryData;
         }
       } catch (retryErr: any) {
-        console.error('[fetchApi Cloud Run Fallback Error]:', retryErr);
+        console.error('[fetchApi Render Fallback Error]:', retryErr);
       }
     }
 
