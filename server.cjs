@@ -56,7 +56,8 @@ var mpPayment = new import_mercadopago.Payment(mpClient);
 var mpPreference = new import_mercadopago.Preference(mpClient);
 async function startServer() {
   const app = (0, import_express.default)();
-  const PORT = 3e3;
+  const PORT = process.env.PORT || 3e3;
+  const NODE_ENV = process.env.NODE_ENV || "development";
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin) {
@@ -76,7 +77,7 @@ async function startServer() {
   app.use(import_express.default.json());
   app.use(import_express.default.urlencoded({ extended: true }));
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", service: "Maestria Grill Mercado Pago API" });
+    res.json({ status: "ok", service: "Maestria Grill Mercado Pago API", environment: NODE_ENV });
   });
   app.get("/api/mercadopago/config", (req, res) => {
     const publicKey = process.env.VITE_MERCADOPAGO_PUBLIC_KEY || "APP_USR-45e3bea4-d7ee-4847-af4b-251fba799c6f";
@@ -344,7 +345,7 @@ async function startServer() {
             if (calculatedHash === hashV1) {
               console.log("[Mercado Pago Webhook] Assinatura X-Signature validada com sucesso.");
             } else {
-              console.warn(`[Mercado Pago Webhook] Alerta: Assinatura X-Signature n\xE3o coincidiu (Calculada: ${calculatedHash}, Recebida: ${hashV1}). Prosseguindo com consulta de seguran\xE7a na API do MP.`);
+              console.warn(`[Mercado Pago Webhook] Alerta: Assinatura X-Signature n\xE3o coincidiu (Calculada: ${calculatedHash}, Recebida: ${hashV1}). Prosseguindo com consulta de seguran\xE7a na API.`);
             }
           }
         } catch (sigErr) {
@@ -442,7 +443,7 @@ async function startServer() {
       return res.status(500).json({ error: "Erro ao verificar status do pagamento" });
     }
   });
-  if (process.env.NODE_ENV !== "production") {
+  if (NODE_ENV !== "production") {
     const vite = await (0, import_vite.createServer)({
       server: { middlewareMode: true },
       appType: "spa"
@@ -450,13 +451,27 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = import_path.default.join(process.cwd(), "dist");
+    app.use((req, res, next) => {
+      if (req.path.startsWith("/assets/")) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      } else if (req.path.endsWith(".html")) {
+        res.setHeader("Cache-Control", "public, max-age=0, must-revalidate");
+      } else {
+        res.setHeader("Cache-Control", "public, max-age=3600");
+      }
+      next();
+    });
     app.use(import_express.default.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(import_path.default.join(distPath, "index.html"));
+      if (!req.path.startsWith("/api/")) {
+        res.sendFile(import_path.default.join(distPath, "index.html"));
+      } else {
+        res.status(404).json({ error: "API endpoint not found" });
+      }
     });
   }
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Server] Maestria Grill rodando na porta ${PORT}`);
+    console.log(`[Server] Maestria Grill rodando na porta ${PORT} (${NODE_ENV})`);
   });
 }
 startServer();
