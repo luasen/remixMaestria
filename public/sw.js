@@ -3,7 +3,11 @@ const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/app-icon.jpg'
+  '/icon-192.png',
+  '/icon-512.png',
+  '/maskable-icon-512.png',
+  '/screenshot-mobile.png',
+  '/screenshot-desktop.png'
 ];
 
 // Install event - Cache core static files
